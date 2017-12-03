@@ -20,7 +20,9 @@ class SimulationField extends React.Component<Props, State> {
     context: any;
 
     componentDidMount() {
-        this.cellSize = Math.floor(Math.round(window.innerWidth * 0.73) / (this.props.maxX + 1));
+        this.cellSize = Math.floor(
+            Math.min(Math.round(window.innerWidth * 0.73), Math.round(window.innerHeight * 0.6)) / (this.props.maxX + 1)
+        );
         this.width = (this.props.maxX + 1) * this.cellSize;
         this.height = (this.props.maxY + 1) * this.cellSize;
         this.context = (ReactDOM.findDOMNode(this) as any).getContext('2d');
@@ -72,7 +74,7 @@ class SimulationField extends React.Component<Props, State> {
     }
 
     render() {
-        return <canvas width={this.width} height={this.height} />;
+        return <canvas style={{ alignSelf: 'center' }} width={this.width} height={this.height} />;
     }
 }
 

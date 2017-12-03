@@ -126,6 +126,20 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
         this.socket = ioCreator(this.onSocketResponse.bind(this));
     }
 
+    listenServerStatus(activate: boolean = true) {
+        if (this.serverIntervalId) {
+            clearInterval(this.serverIntervalId);
+        }
+        if (!activate) {
+            return;
+        }
+        this.serverIntervalId = setInterval(() => {
+            this.socket.send({
+                cmd: 'SERVER_STATUS'
+            });
+        }, 1000);
+    }
+
     onSocketResponse(command: any) {
         if (this.requests[command.code]) {
             this.requests[command.code].resolve(command);
@@ -133,18 +147,13 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
         }
         switch (command.code) {
             case 'HANDSHAKE':
-                console.clear();
                 if (this.serverIntervalId) {
                     clearInterval(this.serverIntervalId);
                 }
                 this.socket.send({
                     cmd: 'SERVER_STATUS'
                 });
-                this.serverIntervalId = setInterval(() => {
-                    this.socket.send({
-                        cmd: 'SERVER_STATUS'
-                    });
-                }, 1000);
+                this.listenServerStatus();
                 break;
             case 'SERVER_STATUS':
                 command.lastPoll = new Date();
@@ -213,11 +222,13 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
     onShowSpec(model: string) {
         this.setState({ modelToSpec: model });
         this.setState({ specOpen: true });
+        this.listenServerStatus(false);
     }
 
     onShowSim(model: string) {
         this.setState({ modelToSpec: model });
         this.setState({ simOpen: true });
+        this.listenServerStatus(false);
     }
 
     onUpdateSpec(form: any) {
@@ -285,8 +296,12 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
                         onOk={form => {
                             this.setState({ specOpen: false });
                             this.onUpdateSpec(form);
+                            this.listenServerStatus();
                         }}
-                        onCancel={() => this.setState({ specOpen: false })}
+                        onCancel={() => {
+                            this.setState({ specOpen: false });
+                            this.listenServerStatus();
+                        }}
                         worker={
                             this.state.serverStatus && this.state.serverStatus.models
                                 ? this.state.serverStatus.models.reduce((result: any, one: any) => {
@@ -301,7 +316,10 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
                         model={this.state.modelToSpec}
                         open={this.state.simOpen}
                         sendCommand={command => this.sendCommandAsync(command)}
-                        onOk={() => this.setState({ simOpen: false })}
+                        onOk={() => {
+                            this.setState({ simOpen: false });
+                            this.listenServerStatus();
+                        }}
                     />
                 )}
                 <div

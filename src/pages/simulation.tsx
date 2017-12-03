@@ -80,8 +80,8 @@ class SimulationDialog extends React.Component<Props, State> {
         //     marginTop: -14
         // };
         return (
-            <Dialog fullWidth={true} open={this.props.open} onRequestClose={this.handleClickOk}>
-                <DialogTitle>Model Simulation</DialogTitle>
+            <Dialog open={this.props.open} onRequestClose={this.handleClickOk}>
+                <DialogTitle>Model Simulation: {this.props.model}</DialogTitle>
                 <DialogContent>
                     {this.state.loading ? (
                         <CircularProgress

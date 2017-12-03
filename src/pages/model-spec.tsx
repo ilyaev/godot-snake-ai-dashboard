@@ -1,7 +1,6 @@
 import * as React from 'react';
 import Button from 'material-ui/Button';
 import Dialog, { DialogActions, DialogContent, DialogTitle } from 'material-ui/Dialog';
-// import TextField from 'material-ui/TextField';
 import Slider from 'rc-slider';
 import 'rc-slider/assets/index.css';
 import Typography from 'material-ui/Typography';
@@ -63,7 +62,7 @@ class ModelSpecDialog extends React.Component<Props, State> {
                 <DialogTitle>Model Spec</DialogTitle>
                 <DialogContent>
                     <Typography type="caption" color="inherit">
-                        {'Epsilon (Exploration rate): ' + this.state.form.epsilon}
+                        {'Epsilon (Exploration rate)'}
                     </Typography>
                     <Slider
                         style={style}
@@ -73,11 +72,15 @@ class ModelSpecDialog extends React.Component<Props, State> {
                         max={0.6}
                         step={0.001}
                         onChange={this.handleChange('epsilon')}
-                        marks={{ '0.6': '0.6' }}
+                        marks={{
+                            '0.6': {
+                                label: <strong>{this.state.form.epsilon}</strong>
+                            }
+                        }}
                         handleStyle={handleStyle}
                     />
                     <Typography type="caption" color="inherit">
-                        {'Alpha (Learning rate): ' + this.state.form.alpha}
+                        {'Alpha (Learning rate)'}
                     </Typography>
                     <Slider
                         style={style}
@@ -87,11 +90,15 @@ class ModelSpecDialog extends React.Component<Props, State> {
                         max={0.1}
                         step={0.0005}
                         onChange={this.handleChange('alpha')}
-                        marks={{ '0.1': '0.1' }}
+                        marks={{
+                            '0.1': {
+                                label: <strong>{this.state.form.alpha}</strong>
+                            }
+                        }}
                         handleStyle={handleStyle}
                     />
                     <Typography type="caption" color="inherit">
-                        {'Gamma (Greed): ' + this.state.form.gamma}
+                        {'Gamma (Greed)'}
                     </Typography>
                     <Slider
                         style={style}
@@ -101,7 +108,11 @@ class ModelSpecDialog extends React.Component<Props, State> {
                         max={0.99}
                         step={0.01}
                         onChange={this.handleChange('gamma')}
-                        marks={{ '0.99': '0.99' }}
+                        marks={{
+                            '0.99': {
+                                label: <strong>{this.state.form.gamma}</strong>
+                            }
+                        }}
                         handleStyle={handleStyle}
                     />
                 </DialogContent>
