@@ -32,9 +32,10 @@
     },
     "scripts": {
         "start": "react-scripts-ts start",
-        "build": "react-scripts-ts build && yarn run deploy",
+        "build": "yarn run compile && react-scripts-ts build && yarn run deploy",
         "test": "react-scripts-ts test --env=jsdom",
         "eject": "react-scripts-ts eject",
-        "deploy": "node deploy.js"
+        "deploy": "node deploy.js",
+        "compile": "babel src/common/snake-scene.js --out-file src/common/snake-scene.js"
     }
 }

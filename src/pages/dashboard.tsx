@@ -196,7 +196,7 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
             this.setState({
                 disabledToggler: false
             });
-        }, 2000);
+        }, 500);
         this.setState({ loading: true });
         this.socket.send({
             cmd: 'DELETE_MODEL',
@@ -253,10 +253,11 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
             this.setState({
                 disabledToggler: false
             });
-        }, 2000);
+        }, 500);
         this.setState({ loading: true });
         this.socket.send({
             cmd: 'CREATE_MODEL',
+            features: form.features,
             name: form.name
         });
     }

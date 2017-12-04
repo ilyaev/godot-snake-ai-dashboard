@@ -4,6 +4,7 @@ import Dialog, { DialogActions, DialogContent, DialogTitle } from 'material-ui/D
 import Slider from 'rc-slider';
 import 'rc-slider/assets/index.css';
 import Typography from 'material-ui/Typography';
+import { featureMap } from './const';
 
 type Props = {
     caption?: string;
@@ -57,6 +58,10 @@ class ModelSpecDialog extends React.Component<Props, State> {
             marginLeft: -14,
             marginTop: -14
         };
+        const features =
+            this.props.worker && this.props.worker.params && this.props.worker.params.features
+                ? this.props.worker.params.features
+                : [];
         return (
             <Dialog fullWidth={true} open={this.props.open} onRequestClose={this.handleClickCancel}>
                 <DialogTitle>Model Spec</DialogTitle>
@@ -115,6 +120,12 @@ class ModelSpecDialog extends React.Component<Props, State> {
                         }}
                         handleStyle={handleStyle}
                     />
+                    <div>
+                        <span>Inputs: </span>
+                        <span>
+                            <strong>{features.map((one: any) => featureMap[one] || one).join(', ')}</strong>
+                        </span>
+                    </div>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={this.handleClickCancel} color="primary">

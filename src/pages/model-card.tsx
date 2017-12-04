@@ -65,12 +65,6 @@ class ModelCard extends React.Component<Props, State> {
                             color="inherit"
                             disabled={this.props.disabledToggler}
                             onClick={() => this.props.onShowSim(this.props.model.name)}
-                            // onClick={() => {
-                            //     var w = window.open('/#' + this.props.model.name, '_blank');
-                            //     if (w) {
-                            //         w.focus();
-                            //     }
-                            // }}
                         >
                             Simulate
                         </Button>
@@ -108,8 +102,6 @@ class ModelCard extends React.Component<Props, State> {
                         smooth
                         autoDrawEasing="ease-out"
                         data={values}
-                        // gradient={['#00c6ff', '#F0F', '#FF0']}
-                        // gradient={['red', 'orange', 'yellow']}
                         gradient={['purple', 'violet']}
                         radius={10}
                         strokeWidth={2}
