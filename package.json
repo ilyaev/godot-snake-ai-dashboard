@@ -32,10 +32,11 @@
     },
     "scripts": {
         "start": "react-scripts-ts start",
+        "compile":
+            "cp ../godot-snake-ai-trainer/src/common/snake-scene.js ./src/common/snake-scene.js && babel src/common/snake-scene.js --out-file src/common/snake-scene.js",
         "build": "yarn run compile && react-scripts-ts build && yarn run deploy",
         "test": "react-scripts-ts test --env=jsdom",
         "eject": "react-scripts-ts eject",
-        "deploy": "node deploy.js",
-        "compile": "babel src/common/snake-scene.js --out-file src/common/snake-scene.js"
+        "deploy": "node deploy.js"
     }
 }

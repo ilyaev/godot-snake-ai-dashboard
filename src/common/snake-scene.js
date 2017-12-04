@@ -2,13 +2,7 @@
 
 var _featureMap;
 
-function _defineProperty(obj, key, value) {
-    if (key in obj) {
-        Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true });
-    } else {
-        obj[key] = value;
-    }return obj;
-}
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 var DQNAgent = require('./agent').DQNAgent;
 var R = require('./agent').R;
@@ -24,6 +18,10 @@ var FEATURE_HEAD_COORDINATES = 1;
 var FEATURE_CLOSEST_FOOD_DICRECTION = 2;
 var FEATURE_TAIL_DIRECTION = 3;
 var FEATURE_VISION_CLOSE_RANGE = 4;
+var FEATURE_VISION_FAR_RANGE = 5;
+var FEATURE_VISION_MID_RANGE = 6;
+
+var binmap = [1, 2, 4, 8, 16, 32, 64, 128];
 
 var featureMap = (_featureMap = {}, _defineProperty(_featureMap, FEATURE_HEAD_COORDINATES, {
     inputs: 2
@@ -33,6 +31,10 @@ var featureMap = (_featureMap = {}, _defineProperty(_featureMap, FEATURE_HEAD_CO
     inputs: 2
 }), _defineProperty(_featureMap, FEATURE_VISION_CLOSE_RANGE, {
     inputs: 4
+}), _defineProperty(_featureMap, FEATURE_VISION_FAR_RANGE, {
+    inputs: 8
+}), _defineProperty(_featureMap, FEATURE_VISION_MID_RANGE, {
+    inputs: 16
 }), _featureMap);
 
 var config = {
@@ -116,7 +118,6 @@ module.exports = {
             scene.params.numStates = calculateMaxNumInputs(scene.params.features || []);
             scene.env = {
                 getNumStates: function getNumStates() {
-                    console.log('params - ', scene.params);
                     return scene.params.numStates;
                 },
                 getMaxNumActions: function getMaxNumActions() {
@@ -195,6 +196,9 @@ module.exports = {
             });
             scene.result.epoch += 1;
             scene.actor.step = 0;
+            if (isWall(scene.target.x, scene.target.y)) {
+                respawnFood();
+            }
         };
 
         var respawnFood = function respawnFood() {
@@ -244,6 +248,36 @@ module.exports = {
             });
         };
 
+        var buildMidRangeVision = function buildMidRangeVision() {
+            var rows = [];
+            for (var dx = -2; dx < 2; dx++) {
+                for (var dy = -2; dy < 2; dy++) {
+                    var value = isWall(scene.actor.x + dx, scene.actor.y + dy) ? 1 : 0;
+                    rows.push(value);
+                }
+            }
+            return rows;
+        };
+
+        var buildFarVision = function buildFarVision() {
+            var rows = [];
+            for (var dx = -4; dx < 4; dx++) {
+                var row = [];
+                var sum = 0;
+                for (var dy = -4; dy < 4; dy++) {
+                    var value = isWall(scene.actor.x + dx, scene.actor.y + dy) ? 1 : 0;
+                    row.push(value);
+                    if (value) {
+                        sum += binmap[row.length - 1];
+                    }
+                }
+                rows.push(sum);
+            }
+            return rows.map(function (one) {
+                return one / 256;
+            });
+        };
+
         var buildState = function buildState() {
             var result = [];
             scene.params.features.map(function (one) {
@@ -267,6 +301,12 @@ module.exports = {
                         result.push((scene.actor.tail[scene.actor.tail.length - 1].x - scene.actor.x) / scene.maxX);
                         result.push((scene.actor.tail[scene.actor.tail.length - 1].y - scene.actor.y) / scene.maxY);
                         break;
+                    case FEATURE_VISION_FAR_RANGE:
+                        result = result.concat(buildFarVision());
+                        break;
+                    case FEATURE_VISION_MID_RANGE:
+                        result = result.concat(buildMidRangeVision());
+                        break;
                     default:
                         break;
                 }
@@ -286,17 +326,6 @@ module.exports = {
                 y: scene.actor.y
             });
 
-            // var stepState = [
-            //     scene.actor.x / scene.maxX,
-            //     scene.actor.y / scene.maxY,
-            //     (scene.target.x - scene.actor.x) / scene.maxX,
-            //     (scene.target.y - scene.actor.y) / scene.maxY,
-            //     isFutureWall(0),
-            //     isFutureWall(1),
-            //     isFutureWall(2),
-            //     isFutureWall(3)
-            // ]
-
             var stepState = buildState();
 
             var action = scene.agent.act(stepState);
@@ -304,12 +333,22 @@ module.exports = {
 
             scene.actor.x = scene.actor.x + act.dx;
             scene.actor.y = scene.actor.y + act.dy;
+            var toRespawn = false;
 
             if (scene.actor.x == scene.target.x && scene.actor.y == scene.target.y) {
                 growSnake();
-                respawnFood();
+                toRespawn = true;
                 if (instanceProps.mode === 'server') {
-                    scene.agent.learn(1);
+                    var availActions = actions.reduce(function (result, next) {
+                        return isWall(scene.actor.x + next.dx, scene.actor.y + next.dy) ? result : result + 1;
+                    }, 0);
+                    if (availActions > 0) {
+                        scene.agent.learn(1);
+                    } else {
+                        restartActor(-1);
+                        scene.agent.learn(-2);
+                        return;
+                    }
                 }
             } else if (isWall(scene.actor.x, scene.actor.y)) {
                 footer = 'WALL';
@@ -340,6 +379,10 @@ module.exports = {
                 }
                 return one;
             });
+
+            if (toRespawn) {
+                respawnFood();
+            }
         };
 
         var printField = function printField() {

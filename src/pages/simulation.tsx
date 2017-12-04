@@ -61,7 +61,7 @@ class SimulationDialog extends React.Component<Props, State> {
                 this.snake.initScene();
                 this.snake.scene.agent = new DQNAgent(this.snake.scene.env, this.snake.scene.spec);
                 this.snake.scene.agent.fromJSON(model.brain);
-                this.snake.scene.agent.epsilon = 0.01;
+                this.snake.scene.agent.epsilon = 0.0001;
                 this.setState({ loading: false, model: response.model });
                 if (this.interval) {
                     clearInterval(this.interval);
