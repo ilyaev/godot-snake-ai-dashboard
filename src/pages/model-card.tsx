@@ -17,6 +17,7 @@ type State = {
 
 export type ModelType = {
     name: string;
+    archive: boolean;
     worker: any;
 };
 
@@ -27,6 +28,7 @@ type Props = {
     onDeleteModel: (name: string) => void;
     onShowSpec: (name: string) => void;
     onShowSim: (name: string) => void;
+    onArchiveModel: (name: string, archive: boolean) => void;
 };
 
 class ModelCard extends React.Component<Props, State> {
@@ -53,6 +55,14 @@ class ModelCard extends React.Component<Props, State> {
                 </CardContent>
                 <CardActions>
                     <Center fit>
+                        <Button
+                            color="inherit"
+                            style={{ marginRight: '10px' }}
+                            disabled={this.props.disabledToggler}
+                            onClick={() => this.props.onArchiveModel(this.props.model.name, !this.props.model.archive)}
+                        >
+                            {this.props.model.archive ? 'Restore' : 'Archive'}
+                        </Button>
                         <Button
                             color="inherit"
                             style={{ marginRight: '10px' }}

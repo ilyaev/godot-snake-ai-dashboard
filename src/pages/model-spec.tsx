@@ -47,6 +47,9 @@ class ModelSpecDialog extends React.Component<Props, State> {
     componentDidMount() {
         const spec = this.props.worker.status.spec;
         const form = Object.assign({}, spec);
+        if (!form.size) {
+            form.size = 7;
+        }
         this.setState({ form });
     }
 
@@ -66,6 +69,24 @@ class ModelSpecDialog extends React.Component<Props, State> {
             <Dialog fullWidth={true} open={this.props.open} onRequestClose={this.handleClickCancel}>
                 <DialogTitle>Model Spec</DialogTitle>
                 <DialogContent>
+                    <Typography type="caption" color="inherit">
+                        {'Field Size'}
+                    </Typography>
+                    <Slider
+                        style={style}
+                        value={this.state.form.size}
+                        defaultValue={7}
+                        min={7}
+                        max={28}
+                        step={7}
+                        onChange={this.handleChange('size')}
+                        marks={{
+                            '28': {
+                                label: <strong>{this.state.form.size}</strong>
+                            }
+                        }}
+                        handleStyle={handleStyle}
+                    />
                     <Typography type="caption" color="inherit">
                         {'Epsilon (Exploration rate)'}
                     </Typography>

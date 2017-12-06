@@ -9,7 +9,7 @@ import { CircularProgress } from 'material-ui/Progress';
 import AppBar from './appbar';
 import BottomNavigation, { BottomNavigationButton } from 'material-ui/BottomNavigation';
 import FavoriteIcon from 'material-ui-icons/Cloud';
-import LocationOnIcon from 'material-ui-icons/NaturePeople';
+import LocationOnIcon from 'material-ui-icons/AccountBalance';
 import LibraryBooks from 'material-ui-icons/LibraryBooks';
 import ConfirmDialog from './confirm';
 import CreateModelDialog from './create';
@@ -126,16 +126,24 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
         this.socket = ioCreator(this.onSocketResponse.bind(this));
     }
 
-    listenServerStatus(activate: boolean = true) {
+    listenServerStatus(activate: boolean = true, archive: boolean = false) {
         if (this.serverIntervalId) {
             clearInterval(this.serverIntervalId);
         }
         if (!activate) {
             return;
         }
+        this.socket.send({
+            cmd: 'SERVER_STATUS',
+            archive: archive
+        });
         this.serverIntervalId = setInterval(() => {
             this.socket.send({
-                cmd: 'SERVER_STATUS'
+                cmd: 'SERVER_STATUS',
+                archive: archive,
+                activeModels: this.state.serverStatus.models
+                    .filter((one: any) => one.worker.active)
+                    .map((one: any) => one.name)
             });
         }, 1000);
     }
@@ -143,7 +151,7 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
     onSocketResponse(command: any) {
         if (this.requests[command.code]) {
             this.requests[command.code].resolve(command);
-            delete this.requests[command];
+            delete this.requests[command.code];
         }
         switch (command.code) {
             case 'HANDSHAKE':
@@ -233,18 +241,24 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
 
     onUpdateSpec(form: any) {
         this.setState({ specOpen: false });
-        this.setState({ disabledToggler: true });
-        setTimeout(() => {
-            this.setState({
-                disabledToggler: false
-            });
-        }, 2000);
-        this.setState({ loading: true });
         this.socket.send({
             cmd: 'UPDATE_MODEL',
             name: this.state.modelToSpec,
             form: form
         });
+    }
+
+    onArchiveModel(model: string, archive: boolean) {
+        this.listenServerStatus(false);
+        this.setState({ disabledToggler: true });
+        this.sendCommandAsync({ cmd: 'ARCHIVE_MODEL', name: model, archive, await: 'ARCHIVE_MODEL_RESULT' }).then(
+            (result: any) => {
+                this.setState({
+                    disabledToggler: false
+                });
+                this.listenServerStatus(true, !archive);
+            }
+        );
     }
 
     createNewModel(form: any) {
@@ -297,11 +311,11 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
                         onOk={form => {
                             this.setState({ specOpen: false });
                             this.onUpdateSpec(form);
-                            this.listenServerStatus();
+                            this.listenServerStatus(true, this.state.page === 2);
                         }}
                         onCancel={() => {
                             this.setState({ specOpen: false });
-                            this.listenServerStatus();
+                            this.listenServerStatus(true, this.state.page === 2);
                         }}
                         worker={
                             this.state.serverStatus && this.state.serverStatus.models
@@ -319,7 +333,7 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
                         sendCommand={command => this.sendCommandAsync(command)}
                         onOk={() => {
                             this.setState({ simOpen: false });
-                            this.listenServerStatus();
+                            this.listenServerStatus(true, this.state.page === 2);
                         }}
                     />
                 )}
@@ -348,7 +362,7 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
                             />
                         )}
                         {this.state.serverStatus.models &&
-                            this.state.page === 0 &&
+                            (this.state.page === 0 || this.state.page === 2) &&
                             this.state.serverStatus.models.map((one: any) => (
                                 <ModelCard
                                     model={one as ModelType}
@@ -356,6 +370,7 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
                                     onDeleteModel={model => this.onModelDelete(model)}
                                     onShowSpec={model => this.onShowSpec(model)}
                                     onShowSim={model => this.onShowSim(model)}
+                                    onArchiveModel={(model, archive) => this.onArchiveModel(model, archive)}
                                     disabledToggler={this.state.disabledToggler}
                                     onChangeStatus={(status, model) => this.onModelStatusChange(status, model)}
                                 />
@@ -365,7 +380,7 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
                             this.state.page === 1 && <ServerStatus status={this.state.serverStatus} />}
                         {this.state.serverStatus &&
                             this.state.serverStatus.status &&
-                            this.state.page === 2 && (
+                            this.state.page === 1 && (
                                 <ServerConnections
                                     status={this.state.serverStatus}
                                     connectionId={this.socket.getConnectionId()}
@@ -375,7 +390,16 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
                         <BottomNavigation
                             value={this.state.page}
                             showLabels
-                            onChange={(_e, value) => this.setState({ page: value })}
+                            onChange={(_e, value) => {
+                                this.setState({ page: value });
+                                if (value === 0) {
+                                    this.listenServerStatus(true, false);
+                                } else if (value === 2) {
+                                    this.listenServerStatus(true, true);
+                                } else if (value === 1) {
+                                    this.listenServerStatus(false);
+                                }
+                            }}
                             style={{
                                 position: 'fixed',
                                 bottom: '0px',
@@ -387,7 +411,7 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
                         >
                             <BottomNavigationButton label="Models" icon={<LibraryBooks />} />
                             <BottomNavigationButton label="Server" icon={<FavoriteIcon />} />
-                            <BottomNavigationButton label="Connections" icon={<LocationOnIcon />} />
+                            <BottomNavigationButton label="Archive" icon={<LocationOnIcon />} />
                         </BottomNavigation>
                         {isDialog || this.state.page !== 0 ? null : (
                             <Button

@@ -49,7 +49,7 @@ var config = {
         maxY: 7,
         features: [FEATURE_HEAD_COORDINATES, FEATURE_CLOSEST_FOOD_DICRECTION, FEATURE_VISION_CLOSE_RANGE]
     },
-    spec: { alpha: 0.02, epsilon: 0.5, learning_steps_per_iteration: 40, experience_size: 10000, gamma: 0.75 },
+    spec: { alpha: 0.02, epsilon: 0.5, learning_steps_per_iteration: 40, experience_size: 10000, gamma: 0.75, rivals: 0, size: 7 },
     actor: {
         x: 3,
         y: 3,
@@ -60,6 +60,7 @@ var config = {
             y: 3
         }]
     },
+    rivals: [],
     target: {
         x: 1,
         y: 1
@@ -77,7 +78,8 @@ var config = {
     },
     qvalues: {},
     history: [],
-    agent: null
+    agent: null,
+    rivalAgent: null
 };
 
 var actions = [{
@@ -114,6 +116,49 @@ module.exports = {
 
         var walls = {};
 
+        var getActiveActors = function getActiveActors() {
+            return [scene.actor].concat(scene.rivals).filter(function (one) {
+                return typeof one.active === 'undefined' || one.active;
+            });
+        };
+
+        var getNextRivalPlace = function getNextRivalPlace() {
+            var cX = 1 + Math.round(Math.random() * (scene.maxX - 1));
+            var cY = 1 + Math.round(Math.random() * (scene.maxY - 1));
+            while (Math.abs(cX - scene.actor.x) > 3 && Math.abs(cY - scene.actor.Y) > 3) {
+                cX = 1 + Math.round(Math.random() * (scene.maxX - 1));
+                cY = 1 + Math.round(Math.random() * (scene.maxY - 1));
+            }
+            return { cX: cX, cY: cY };
+        };
+
+        var initRivals = function initRivals() {
+            scene.actor.student = true;
+            scene.actor.active = true;
+            var shift = 0;
+            scene.rivals = [];
+            for (var i = 0; i < scene.spec.rivals || 0; i++) {
+                var place = getNextRivalPlace();
+                var x = place.cX;
+                var y = place.cY;
+                scene.rivals.push({
+                    x: x,
+                    y: y,
+                    active: true,
+                    student: false,
+                    target: {
+                        x: 3,
+                        y: 3
+                    },
+                    step: 0,
+                    tail: [{
+                        x: x - 1,
+                        y: y
+                    }]
+                });
+            }
+        };
+
         var initScene = function initScene() {
             scene.params.numStates = calculateMaxNumInputs(scene.params.features || []);
             scene.env = {
@@ -123,9 +168,12 @@ module.exports = {
                 getMaxNumActions: function getMaxNumActions() {
                     return scene.params.numActions;
                 }
-            };
-            scene.agent = new DQNAgent(scene.env, scene.spec);
+                // scene.agent = new DQNAgent(scene.env, scene.spec)
+                // scene.rivalAgent = new DQNAgent(scene.env, scene.spec)
+            };initAgents(scene.env, scene.spec);
             scene.defaultActor = clone(scene.actor);
+            scene.defaultActor.student = true;
+            scene.defaultActor.active = true;
             scene.defaultResult = clone(scene.result);
 
             for (var x = 0; x <= scene.maxX; x++) {
@@ -144,6 +192,7 @@ module.exports = {
             scene.result.wins = 0;
             scene.result.step = 0;
             scene.result.epoch = 0;
+            initRivals();
         };
 
         var calculateAverage = function calculateAverage(period) {
@@ -179,7 +228,7 @@ module.exports = {
 
         var restartActor = function restartActor(reward) {
             if (reward > 0) {
-                respawnFood();
+                respawnFood(scene.actor);
             }
             scene.history.push({
                 size: scene.actor.tail.length,
@@ -188,6 +237,7 @@ module.exports = {
             });
             scene.history = scene.history.splice(-1000);
             scene.actor = clone(scene.defaultActor);
+            initRivals();
             if (!scene.result.epoch) {
                 scene.result.epoch = 0;
             }
@@ -197,11 +247,11 @@ module.exports = {
             scene.result.epoch += 1;
             scene.actor.step = 0;
             if (isWall(scene.target.x, scene.target.y)) {
-                respawnFood();
+                respawnFood(scene.actor);
             }
         };
 
-        var respawnFood = function respawnFood() {
+        var respawnFood = function respawnFood(actor) {
             var wall = true;
             var x, y;
             while (wall == true) {
@@ -209,18 +259,25 @@ module.exports = {
                 y = Math.round(Math.random() * scene.maxY);
                 wall = isWall(x, y);
             }
-            scene.target.x = x;
-            scene.target.y = y;
+            if (actor.student) {
+                scene.target.x = x;
+                scene.target.y = y;
+            } else {
+                actor.target.x = x;
+                actor.target.y = y;
+            }
         };
 
-        var growSnake = function growSnake() {
-            var last = scene.actor.tail[scene.actor.tail.length - 1];
-            scene.actor.tail.push({
+        var growSnake = function growSnake(actor) {
+            var last = actor.tail[actor.tail.length - 1];
+            actor.tail.push({
                 x: last.x,
                 y: last.y,
                 wait: 1
             });
-            scene.result.wins++;
+            if (actor.student) {
+                scene.result.wins++;
+            }
         };
 
         var isWall = function isWall(x, y) {
@@ -230,9 +287,9 @@ module.exports = {
             return walls[x][y];
         };
 
-        var isFutureWall = function isFutureWall(action) {
+        var isFutureWall = function isFutureWall(action, actor) {
             var d = actions[action];
-            return isWall(scene.actor.x + d.dx, scene.actor.y + d.dy) ? 1 : 0;
+            return isWall(actor.x + d.dx, actor.y + d.dy) ? 1 : 0;
         };
 
         var buildWalls = function buildWalls() {
@@ -241,31 +298,32 @@ module.exports = {
                     walls[x][y] = false;
                 }
             }
-
-            walls[scene.actor.x][scene.actor.y] = true;
-            scene.actor.tail.forEach(function (one) {
-                return walls[one.x][one.y] = true;
+            getActiveActors().forEach(function (actor) {
+                walls[actor.x][actor.y] = true;
+                actor.tail.forEach(function (one) {
+                    return walls[one.x][one.y] = true;
+                });
             });
         };
 
-        var buildMidRangeVision = function buildMidRangeVision() {
+        var buildMidRangeVision = function buildMidRangeVision(actor) {
             var rows = [];
             for (var dx = -2; dx < 2; dx++) {
                 for (var dy = -2; dy < 2; dy++) {
-                    var value = isWall(scene.actor.x + dx, scene.actor.y + dy) ? 1 : 0;
+                    var value = isWall(actor.x + dx, actor.y + dy) ? 1 : 0;
                     rows.push(value);
                 }
             }
             return rows;
         };
 
-        var buildFarVision = function buildFarVision() {
+        var buildFarVision = function buildFarVision(actor) {
             var rows = [];
             for (var dx = -4; dx < 4; dx++) {
                 var row = [];
                 var sum = 0;
                 for (var dy = -4; dy < 4; dy++) {
-                    var value = isWall(scene.actor.x + dx, scene.actor.y + dy) ? 1 : 0;
+                    var value = isWall(actor.x + dx, actor.y + dy) ? 1 : 0;
                     row.push(value);
                     if (value) {
                         sum += binmap[row.length - 1];
@@ -278,34 +336,39 @@ module.exports = {
             });
         };
 
-        var buildState = function buildState() {
+        var buildState = function buildState(actor) {
             var result = [];
             scene.params.features.map(function (one) {
                 return parseInt(one);
             }).forEach(function (feature) {
                 switch (feature) {
                     case FEATURE_HEAD_COORDINATES:
-                        result.push(scene.actor.x / scene.maxX);
-                        result.push(scene.actor.y / scene.maxY);
+                        result.push(actor.x / scene.maxX);
+                        result.push(actor.y / scene.maxY);
                         break;
                     case FEATURE_CLOSEST_FOOD_DICRECTION:
-                        result.push((scene.target.x - scene.actor.x) / scene.maxX);
-                        result.push((scene.target.y - scene.actor.y) / scene.maxY);
+                        if (actor.target) {
+                            result.push((actor.target.x - actor.x) / scene.maxX);
+                            result.push((actor.target.y - actor.y) / scene.maxY);
+                        } else {
+                            result.push((scene.target.x - actor.x) / scene.maxX);
+                            result.push((scene.target.y - actor.y) / scene.maxY);
+                        }
                         break;
                     case FEATURE_VISION_CLOSE_RANGE:
                         ;[0, 1, 2, 3].forEach(function (direction) {
-                            return result.push(isFutureWall(direction));
+                            return result.push(isFutureWall(direction, actor));
                         });
                         break;
                     case FEATURE_TAIL_DIRECTION:
-                        result.push((scene.actor.tail[scene.actor.tail.length - 1].x - scene.actor.x) / scene.maxX);
-                        result.push((scene.actor.tail[scene.actor.tail.length - 1].y - scene.actor.y) / scene.maxY);
+                        result.push((actor.tail[actor.tail.length - 1].x - actor.x) / scene.maxX);
+                        result.push((actor.tail[actor.tail.length - 1].y - actor.y) / scene.maxY);
                         break;
                     case FEATURE_VISION_FAR_RANGE:
-                        result = result.concat(buildFarVision());
+                        result = result.concat(buildFarVision(actor));
                         break;
                     case FEATURE_VISION_MID_RANGE:
-                        result = result.concat(buildMidRangeVision());
+                        result = result.concat(buildMidRangeVision(actor));
                         break;
                     default:
                         break;
@@ -315,74 +378,112 @@ module.exports = {
         };
 
         var nextStep = function nextStep() {
-            buildWalls();
-
             scene.result.step++;
             scene.actor.step += 1;
 
             var footer = '';
-            var prev = clone({
-                x: scene.actor.x,
-                y: scene.actor.y
-            });
 
-            var stepState = buildState();
+            getActiveActors().forEach(function (actor) {
+                buildWalls();
 
-            var action = scene.agent.act(stepState);
-            var act = actions[action];
+                var toRespawn = false;
+                var stepState = buildState(actor);
 
-            scene.actor.x = scene.actor.x + act.dx;
-            scene.actor.y = scene.actor.y + act.dy;
-            var toRespawn = false;
+                var action = actor.student ? scene.agent.act(stepState) : scene.rivalAgent.act(stepState);
+                var act = actions[action];
 
-            if (scene.actor.x == scene.target.x && scene.actor.y == scene.target.y) {
-                growSnake();
-                toRespawn = true;
-                if (instanceProps.mode === 'server') {
-                    var availActions = actions.reduce(function (result, next) {
-                        return isWall(scene.actor.x + next.dx, scene.actor.y + next.dy) ? result : result + 1;
-                    }, 0);
-                    if (availActions > 0) {
-                        scene.agent.learn(1);
-                    } else {
+                var prev = clone({
+                    x: actor.x,
+                    y: actor.y
+                });
+
+                actor.x += act.dx;
+                actor.y += act.dy;
+
+                if (!actor.target) {
+                    actor.target = scene.target;
+                }
+
+                if (actor.x == actor.target.x && actor.y == actor.target.y) {
+                    growSnake(actor);
+                    toRespawn = true;
+                    if (instanceProps.mode === 'server' && actor.student) {
+                        var availActions = actions.reduce(function (result, next) {
+                            return isWall(scene.actor.x + next.dx, scene.actor.y + next.dy) ? result : result + 1;
+                        }, 0);
+                        if (availActions > 0) {
+                            scene.agent.learn(1);
+                        } else {
+                            restartActor(-1);
+                            scene.agent.learn(-2);
+                            return;
+                        }
+                    }
+                } else if (isWall(actor.x, actor.y)) {
+                    if (actor.student) {
+                        footer = 'WALL';
                         restartActor(-1);
-                        scene.agent.learn(-2);
-                        return;
+
+                        if (instanceProps.mode === 'server') {
+                            scene.agent.learn(-1);
+                        }
+                    } else {
+                        actor.active = false;
+                    }
+                } else {
+                    if (instanceProps.mode === 'server' && actor.student) {
+                        scene.agent.learn(0);
                     }
                 }
-            } else if (isWall(scene.actor.x, scene.actor.y)) {
-                footer = 'WALL';
-                restartActor(-1);
 
-                if (instanceProps.mode === 'server') {
-                    scene.agent.learn(-1);
-                }
-                return;
-            } else {
-                if (instanceProps.mode === 'server') {
-                    scene.agent.learn(0);
-                }
-            }
-
-            scene.actor.tail = scene.actor.tail.map(function (one) {
-                if (one.wait > 0) {
-                    one.wait--;
+                actor.tail = actor.tail.map(function (one) {
+                    if (one.wait > 0) {
+                        one.wait--;
+                        return one;
+                    } else {
+                        var next = clone({
+                            x: one.x,
+                            y: one.y
+                        });
+                        one.x = prev.x;
+                        one.y = prev.y;
+                        prev = clone(next);
+                    }
                     return one;
-                } else {
-                    var next = clone({
-                        x: one.x,
-                        y: one.y
-                    });
-                    one.x = prev.x;
-                    one.y = prev.y;
-                    prev = clone(next);
-                }
-                return one;
-            });
+                });
 
-            if (toRespawn) {
-                respawnFood();
+                if (toRespawn) {
+                    respawnFood(actor);
+                }
+            });
+        };
+
+        var initAgents = function initAgents(params, spec) {
+            scene.agent = new DQNAgent(params, spec);
+            scene.rivalAgent = new DQNAgent(params, spec);
+        };
+
+        var implantBrain = function implantBrain(agentBrain) {
+            var rivalBrain = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+
+            scene.agent.fromJSON(agentBrain);
+            scene.rivalAgent.fromJSON(rivalBrain ? rivalBrain : agentBrain);
+        };
+
+        var resizeTo = function resizeTo(maxX, maxY) {
+            scene.maxX = maxX;
+            scene.maxY = maxY;
+            scene.params.maxX = maxX;
+            scene.params.maxY = maxY;
+            for (var x = 0; x <= scene.maxX; x++) {
+                if (!walls[x]) {
+                    walls[x] = {};
+                }
+                for (var y = 0; y <= scene.maxY; y++) {
+                    walls[x][y] = false;
+                }
             }
+            buildWalls();
         };
 
         var printField = function printField() {
@@ -419,13 +520,17 @@ module.exports = {
             scene: scene,
             calculateMaxNumInputs: calculateMaxNumInputs,
             initScene: initScene,
+            initRivals: initRivals,
             restartActor: restartActor,
             growSnake: growSnake,
             isWall: isWall,
             clone: clone,
             nextStep: nextStep,
             generateID: generateID,
-            printField: printField
+            printField: printField,
+            resizeTo: resizeTo,
+            initAgents: initAgents,
+            implantBrain: implantBrain
         };
     }
 };

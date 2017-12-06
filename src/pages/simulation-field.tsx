@@ -5,8 +5,10 @@ type Props = {
     maxX: number;
     maxY: number;
     actor: any;
+    rivals: any[];
     food: any;
     turn: number;
+    onSizeChange: (size: number) => void;
 };
 
 type State = {};
@@ -19,22 +21,30 @@ class SimulationField extends React.Component<Props, State> {
     cellSize = 0;
     context: any;
 
-    componentDidMount() {
+    recalcDimensions() {
+        this.context = (ReactDOM.findDOMNode(this) as any).getContext('2d');
         this.cellSize = Math.floor(
             Math.min(Math.round(window.innerWidth * 0.73), Math.round(window.innerHeight * 0.6)) / (this.props.maxX + 1)
         );
         this.width = (this.props.maxX + 1) * this.cellSize;
         this.height = (this.props.maxY + 1) * this.cellSize;
-        this.context = (ReactDOM.findDOMNode(this) as any).getContext('2d');
-        // this.paint();
+    }
+
+    componentDidMount() {
+        this.recalcDimensions();
     }
 
     componentDidUpdate() {
-        var contextEl = ReactDOM.findDOMNode(this);
-        var context = (contextEl as any).getContext('2d');
-        this.context = context;
-        context.clearRect(0, 0, this.width, this.height);
+        this.recalcDimensions();
         this.paint();
+    }
+
+    paint() {
+        this.context.clearRect(0, 0, this.width, this.height);
+        this.context.save();
+        this.drawGrid();
+        this.drawActors();
+        this.context.restore();
     }
 
     drawGrid() {
@@ -50,27 +60,33 @@ class SimulationField extends React.Component<Props, State> {
         this.context.restore();
     }
 
+    drawActor(actor: any) {
+        this.context.save();
+        if (actor.target) {
+            this.drawRect(actor.target.x, actor.target.y, 'red');
+        }
+        this.drawRect(actor.x, actor.y, '#006400');
+        var color = 'green';
+        if (typeof actor.student !== 'undefined' && !actor.student) {
+            color = 'orange';
+        }
+        actor.tail.forEach((tail: any) => this.drawRect(tail.x, tail.y, color));
+        this.context.restore();
+    }
+
+    drawActors() {
+        this.drawRect(this.props.food.x, this.props.food.y, 'red');
+        [this.props.actor]
+            .concat(this.props.rivals)
+            .filter(one => typeof one.active === 'undefined' || one.active)
+            .forEach(actor => this.drawActor(actor));
+    }
+
     drawRect(ax: number, ay: number, color: string) {
         this.context.fillStyle = color;
         const x = ax * this.cellSize;
         const y = ay * this.cellSize;
-        this.context.fillRect(x + 2, y + 2, this.cellSize - 4, this.cellSize - 4);
-    }
-
-    drawActor() {
-        this.context.save();
-        this.drawRect(this.props.actor.x, this.props.actor.y, '#006400');
-        this.drawRect(this.props.food.x, this.props.food.y, 'red');
-        this.props.actor.tail.forEach((tail: any) => this.drawRect(tail.x, tail.y, 'green'));
-        this.context.restore();
-    }
-
-    paint() {
-        this.context.save();
-        this.drawGrid();
-        this.drawActor();
-
-        this.context.restore();
+        this.context.fillRect(x + 1, y + 1, this.cellSize - 2, this.cellSize - 2);
     }
 
     render() {

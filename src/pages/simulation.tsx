@@ -1,12 +1,8 @@
 import * as React from 'react';
 import Button from 'material-ui/Button';
 import Dialog, { DialogActions, DialogContent, DialogTitle } from 'material-ui/Dialog';
-import Typography from 'material-ui/Typography';
 import Field from './simulation-field';
 import { CircularProgress } from 'material-ui/Progress';
-import { clearInterval } from 'timers';
-const DQNAgent = require('../common/agent').DQNAgent;
-// import Slider from 'rc-slider';
 import 'rc-slider/assets/index.css';
 
 type Props = {
@@ -32,6 +28,8 @@ class SimulationDialog extends React.Component<Props, State> {
     };
 
     snake: any = {} as any;
+    model: any = {} as any;
+    size: number;
     interval: any;
 
     handleClickOk = () => {
@@ -45,43 +43,65 @@ class SimulationDialog extends React.Component<Props, State> {
         });
     }
 
+    initSnake(model: any, size: number) {
+        this.model = model;
+        this.size = size;
+        delete this.snake;
+        this.snake = require('../common/snake-scene').instance({
+            mode: 'client'
+        });
+        model.maxX = size;
+        model.maxY = size;
+        model.params.maxX = size;
+        model.params.maxY = size;
+        this.snake.scene.spec = model.spec;
+        this.snake.scene.spec.rivals = (Math.floor(size / 7) - 1) * 2;
+        this.snake.scene.params = model.params;
+        this.snake.scene.maxX = model.maxX;
+        this.snake.scene.maxY = model.maxY;
+        this.snake.scene.modelName = this.props.model;
+        this.snake.initScene();
+        this.snake.initAgents(this.snake.scene.env, this.snake.scene.spec);
+        this.snake.implantBrain(model.brain);
+        this.snake.scene.agent.epsilon = 0.0001;
+        this.snake.scene.rivalAgent.epsilon = 0.0001;
+        this.setState({ loading: false, model: model, turn: 1 });
+        this.runSimulation(Math.round(100 / (size / 7)));
+    }
+
+    runSimulation(speed: number) {
+        if (this.interval) {
+            clearInterval(this.interval);
+        }
+        this.interval = setInterval(() => this.nextStep(), speed);
+    }
+
     componentDidMount() {
         this.props
             .sendCommand({ cmd: 'LOAD_MODEL', model: this.props.model, await: 'LOAD_MODEL' })
             .then((response: any) => {
                 const model = response.model;
-                this.snake = require('../common/snake-scene').instance({
-                    mode: 'client'
-                });
-                this.snake.scene.spec = model.spec;
-                this.snake.scene.params = model.params;
-                this.snake.scene.maxX = model.maxX;
-                this.snake.scene.maxY = model.maxY;
-                this.snake.scene.modelName = this.props.model;
-                this.snake.initScene();
-                this.snake.scene.agent = new DQNAgent(this.snake.scene.env, this.snake.scene.spec);
-                this.snake.scene.agent.fromJSON(model.brain);
-                this.snake.scene.agent.epsilon = 0.0001;
-                this.setState({ loading: false, model: response.model });
-                if (this.interval) {
-                    clearInterval(this.interval);
-                }
-                setInterval(() => this.nextStep(), 100);
+                this.initSnake(model, model.maxX);
             })
             .catch(e => console.log(e));
     }
 
+    componentWillUnmount() {
+        if (this.interval) {
+            clearInterval(this.interval);
+        }
+    }
+
+    onSizeChange(size: number) {
+        this.initSnake(this.model, size);
+    }
+
     render() {
-        // const style = { marginTop: '20px', marginBottom: '20px' };
-        // const handleStyle = {
-        //     height: 28,
-        //     width: 28,
-        //     marginLeft: -14,
-        //     marginTop: -14
-        // };
         return (
             <Dialog open={this.props.open} onRequestClose={this.handleClickOk}>
-                <DialogTitle>Model Simulation: {this.props.model}</DialogTitle>
+                <DialogTitle>
+                    Sim {this.props.model} : {this.state.loading ? '-' : this.snake.scene.actor.tail.length}
+                </DialogTitle>
                 <DialogContent>
                     {this.state.loading ? (
                         <CircularProgress
@@ -94,28 +114,23 @@ class SimulationDialog extends React.Component<Props, State> {
                             maxX={this.state.model.maxX}
                             maxY={this.state.model.maxY}
                             actor={this.snake.scene.actor}
+                            rivals={this.snake.scene.rivals}
                             food={this.snake.scene.target}
                             turn={this.state.turn}
+                            onSizeChange={size => this.onSizeChange(size)}
                         />
                     )}
                 </DialogContent>
                 <DialogActions>
-                    {this.state.loading ? null : (
-                        <div style={{ marginTop: '-3px', display: 'float' }}>
-                            {/* <Slider
-                                style={style}
-                                value={5}
-                                defaultValue={5}
-                                min={1}
-                                max={10}
-                                step={0.1}
-                                // onChange={this.handleChange('epsilon')}
-                                // marks={{ '1': '0.6' }}
-                                handleStyle={handleStyle}
-                            /> */}
-                            <Typography type="title">Size: {this.snake.scene.actor.tail.length}</Typography>
-                        </div>
-                    )}
+                    <Button onClick={() => this.onSizeChange(7)} color="primary" autoFocus>
+                        Small
+                    </Button>
+                    <Button onClick={() => this.onSizeChange(15)} color="primary" autoFocus>
+                        Medium
+                    </Button>
+                    <Button onClick={() => this.onSizeChange(30)} color="primary" autoFocus>
+                        Big
+                    </Button>
                     <Button onClick={this.handleClickOk} color="primary" autoFocus>
                         Close
                     </Button>
