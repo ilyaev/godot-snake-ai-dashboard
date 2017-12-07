@@ -20,6 +20,8 @@ var FEATURE_TAIL_DIRECTION = 3;
 var FEATURE_VISION_CLOSE_RANGE = 4;
 var FEATURE_VISION_FAR_RANGE = 5;
 var FEATURE_VISION_MID_RANGE = 6;
+var FEATURE_TAIL_SIZE = 7;
+var FEATURE_HUNGER = 8;
 
 var binmap = [1, 2, 4, 8, 16, 32, 64, 128];
 
@@ -35,6 +37,10 @@ var featureMap = (_featureMap = {}, _defineProperty(_featureMap, FEATURE_HEAD_CO
     inputs: 8
 }), _defineProperty(_featureMap, FEATURE_VISION_MID_RANGE, {
     inputs: 16
+}), _defineProperty(_featureMap, FEATURE_TAIL_SIZE, {
+    inputs: 1
+}), _defineProperty(_featureMap, FEATURE_HUNGER, {
+    inputs: 1
 }), _featureMap);
 
 var config = {
@@ -54,6 +60,7 @@ var config = {
         x: 3,
         y: 3,
         averageSteps: 0,
+        withoutFood: 0,
         step: 0,
         tail: [{
             x: 2,
@@ -370,6 +377,12 @@ module.exports = {
                     case FEATURE_VISION_MID_RANGE:
                         result = result.concat(buildMidRangeVision(actor));
                         break;
+                    case FEATURE_TAIL_SIZE:
+                        result.push(actor.tail.length / scene.maxX * (scene.maxX / 3) - 0.5);
+                        break;
+                    case FEATURE_HUNGER:
+                        result.push(actor.withoutFood ? actor.withoutFood / scene.maxX * (scene.maxX / 3) - 0.5 : 0);
+                        break;
                     default:
                         break;
                 }
@@ -403,9 +416,14 @@ module.exports = {
                 if (!actor.target) {
                     actor.target = scene.target;
                 }
-
+                if (actor.student) {
+                    actor.withoutFood++;
+                }
                 if (actor.x == actor.target.x && actor.y == actor.target.y) {
                     growSnake(actor);
+                    if (actor.student) {
+                        actor.withoutFood = 0;
+                    }
                     toRespawn = true;
                     if (instanceProps.mode === 'server' && actor.student) {
                         var availActions = actions.reduce(function (result, next) {
@@ -431,6 +449,15 @@ module.exports = {
                         actor.active = false;
                     }
                 } else {
+                    if (actor.student) {
+                        if (actor.withoutFood > scene.maxX * (scene.maxX / 3)) {
+                            restartActor(-1);
+                            if (instanceProps.mode === 'server') {
+                                scene.agent.learn(-1);
+                            }
+                            return;
+                        }
+                    }
                     if (instanceProps.mode === 'server' && actor.student) {
                         scene.agent.learn(0);
                     }

@@ -4,5 +4,7 @@ export const featureMap = {
     '3': 'Tail direction',
     '4': 'Short-range vision',
     '6': 'Mid-range vision',
-    '5': 'Long-range vision'
+    '5': 'Long-range vision',
+    '7': 'Tail Size',
+    '8': 'Hunger'
 };
