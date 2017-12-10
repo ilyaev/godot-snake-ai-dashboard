@@ -13,6 +13,9 @@ var clone = function clone(obj) {
 var generateID = function generateID() {
     return Math.round(Math.random() * 100000);
 };
+var randNum = function randNum(num) {
+    return Math.floor(Math.random() * num);
+};
 
 var FEATURE_HEAD_COORDINATES = 1;
 var FEATURE_CLOSEST_FOOD_DICRECTION = 2;
@@ -22,6 +25,9 @@ var FEATURE_VISION_FAR_RANGE = 5;
 var FEATURE_VISION_MID_RANGE = 6;
 var FEATURE_TAIL_SIZE = 7;
 var FEATURE_HUNGER = 8;
+var FEATURE_FULL_MAP_4 = 9;
+var FEATURE_FULL_MAP_6 = 10;
+var academy = require('./levels');
 
 var binmap = [1, 2, 4, 8, 16, 32, 64, 128];
 
@@ -41,6 +47,10 @@ var featureMap = (_featureMap = {}, _defineProperty(_featureMap, FEATURE_HEAD_CO
     inputs: 1
 }), _defineProperty(_featureMap, FEATURE_HUNGER, {
     inputs: 1
+}), _defineProperty(_featureMap, FEATURE_FULL_MAP_4, {
+    inputs: 16
+}), _defineProperty(_featureMap, FEATURE_FULL_MAP_6, {
+    inputs: 36
 }), _featureMap);
 
 var config = {
@@ -67,6 +77,9 @@ var config = {
             y: 3
         }]
     },
+    food: [],
+    maxFood: 10,
+    level: false,
     rivals: [],
     target: {
         x: 1,
@@ -122,6 +135,7 @@ module.exports = {
         scene.id = generateID();
 
         var walls = {};
+        var foods = {};
 
         var getActiveActors = function getActiveActors() {
             return [scene.actor].concat(scene.rivals).filter(function (one) {
@@ -175,9 +189,8 @@ module.exports = {
                 getMaxNumActions: function getMaxNumActions() {
                     return scene.params.numActions;
                 }
-                // scene.agent = new DQNAgent(scene.env, scene.spec)
-                // scene.rivalAgent = new DQNAgent(scene.env, scene.spec)
-            };initAgents(scene.env, scene.spec);
+            };
+            initAgents(scene.env, scene.spec);
             scene.defaultActor = clone(scene.actor);
             scene.defaultActor.student = true;
             scene.defaultActor.active = true;
@@ -189,10 +202,12 @@ module.exports = {
                 }
                 if (!walls[x]) {
                     walls[x] = {};
+                    foods[x] = {};
                 }
                 for (var y = 0; y <= scene.maxY; y++) {
                     scene.qvalues[x][y] = 0;
                     walls[x][y] = false;
+                    foods[x][y] = false;
                 }
             }
 
@@ -234,9 +249,6 @@ module.exports = {
         };
 
         var restartActor = function restartActor(reward) {
-            if (reward > 0) {
-                respawnFood(scene.actor);
-            }
             scene.history.push({
                 size: scene.actor.tail.length,
                 step: scene.actor.step,
@@ -244,6 +256,13 @@ module.exports = {
             });
             scene.history = scene.history.splice(-1000);
             scene.actor = clone(scene.defaultActor);
+            var place = getNextRivalPlace();
+            var x = place.cX;
+            var y = place.cY;
+            scene.actor.x = x;
+            scene.actor.y = y;
+            scene.actor.tail[0].x = x - 1;
+            scene.actor.tail[0].y = y - 1;
             initRivals();
             if (!scene.result.epoch) {
                 scene.result.epoch = 0;
@@ -253,25 +272,61 @@ module.exports = {
             });
             scene.result.epoch += 1;
             scene.actor.step = 0;
-            if (isWall(scene.target.x, scene.target.y)) {
-                respawnFood(scene.actor);
-            }
+            scene.food = [];
+            respawnFood(scene.actor);
+            scene.actor.target = scene.food[randNum(scene.food.length)];
         };
 
-        var respawnFood = function respawnFood(actor) {
+        var getNextFood = function getNextFood() {
             var wall = true;
             var x, y;
             while (wall == true) {
                 x = Math.round(Math.random() * scene.maxX);
                 y = Math.round(Math.random() * scene.maxY);
                 wall = isWall(x, y);
+                if (!wall) {
+                    wall = isFood(x, y);
+                }
             }
-            if (actor.student) {
-                scene.target.x = x;
-                scene.target.y = y;
+            return { x: x, y: y };
+        };
+
+        var removeFood = function removeFood(food) {
+            scene.food = scene.food.filter(function (one) {
+                return one.x !== food.x || one.y != food.y;
+            });
+            while (scene.food.length < scene.maxFood) {
+                respawnFood(false);
+            }
+        };
+
+        var respawnFood = function respawnFood(actor) {
+            var food = getNextFood();
+            if (actor) {
+                if (actor.student) {
+                    removeFood(scene.target, actor);
+                    scene.target.x = food.x;
+                    scene.target.y = food.y;
+                    //console.log('---eaten by player')
+                } else {
+                    removeFood(actor.target, actor);
+                    //console.log('---eaten by rivals')
+                    actor.target.x = food.x;
+                    actor.target.y = food.y;
+                }
+            }
+            var newFood = { x: food.x, y: food.y };
+            food.actor = actor ? actor : false;
+            scene.food.push(food);
+        };
+
+        var shrinkSnake = function shrinkSnake(actor) {
+            if (actor.tail.length > 1) {
+                actor.tail = actor.tail.slice(0, -1);
+                actor.withoutFood = 0;
+                return true;
             } else {
-                actor.target.x = x;
-                actor.target.y = y;
+                return false;
             }
         };
 
@@ -282,9 +337,11 @@ module.exports = {
                 y: last.y,
                 wait: 1
             });
-            if (actor.student) {
-                scene.result.wins++;
-            }
+            var target = scene.food[randNum(scene.food.length)];
+            actor.target = {
+                x: target.x,
+                y: target.y
+            };
         };
 
         var isWall = function isWall(x, y) {
@@ -292,6 +349,13 @@ module.exports = {
                 return true;
             }
             return walls[x][y];
+        };
+
+        var isFood = function isFood(x, y) {
+            if (typeof foods[x] === 'undefined' || typeof foods[x][y] === 'undefined') {
+                return false;
+            }
+            return foods[x][y];
         };
 
         var isFutureWall = function isFutureWall(action, actor) {
@@ -303,14 +367,41 @@ module.exports = {
             for (var x = 0; x <= scene.maxX; x++) {
                 for (var y = 0; y <= scene.maxY; y++) {
                     walls[x][y] = false;
+                    foods[x][y] = false;
                 }
             }
+            if (scene.level) {
+                scene.level.walls.forEach(function (wall) {
+                    return walls[wall.x][wall.y] = true;
+                });
+            }
+            scene.food.forEach(function (food) {
+                return foods[food.x][food.y] = true;
+            });
             getActiveActors().forEach(function (actor) {
                 walls[actor.x][actor.y] = true;
                 actor.tail.forEach(function (one) {
                     return walls[one.x][one.y] = true;
                 });
             });
+        };
+
+        var buildFullMap = function buildFullMap(actor, fullRange) {
+            var rows = [];
+            var range = Math.round(fullRange / 2);
+            for (var dx = -range; dx < range; dx++) {
+                for (var dy = -range; dy < range; dy++) {
+                    var value = 0;
+                    if (isWall(actor.x + dx, actor.y + dy)) {
+                        value = -1;
+                    }
+                    if (isFood(actor.x + dx, actor.y + dy)) {
+                        value = 1;
+                    }
+                    rows.push(value);
+                }
+            }
+            return rows;
         };
 
         var buildMidRangeVision = function buildMidRangeVision(actor) {
@@ -377,17 +468,29 @@ module.exports = {
                     case FEATURE_VISION_MID_RANGE:
                         result = result.concat(buildMidRangeVision(actor));
                         break;
+                    case FEATURE_FULL_MAP_4:
+                        result = result.concat(buildFullMap(actor, 4));
+                        break;
+                    case FEATURE_FULL_MAP_6:
+                        result = result.concat(buildFullMap(actor, 6));
+                        break;
                     case FEATURE_TAIL_SIZE:
-                        result.push(actor.tail.length / scene.maxX * (scene.maxX / 3) - 0.5);
+                        result.push(actor.tail.length / scene.maxX * (scene.maxY / 3) - 0.5);
                         break;
                     case FEATURE_HUNGER:
-                        result.push(actor.withoutFood ? actor.withoutFood / scene.maxX * (scene.maxX / 3) - 0.5 : 0);
+                        result.push(actor.withoutFood ? actor.withoutFood / scene.maxX * (scene.maxX / 2) - 0.5 : 0);
                         break;
                     default:
                         break;
                 }
             });
             return result;
+        };
+
+        var teachAgent = function teachAgent(reward) {
+            if (instanceProps.mode === 'server') {
+                scene.agent.learn(reward);
+            }
         };
 
         var nextStep = function nextStep() {
@@ -401,14 +504,16 @@ module.exports = {
 
                 var toRespawn = false;
                 var stepState = buildState(actor);
+                //console.log(scene.params.features, calculateMaxNumInputs(scene.params.features))
+                //console.log(stepState.map(one => Math.round(one * 100) / 100))
 
                 var action = actor.student ? scene.agent.act(stepState) : scene.rivalAgent.act(stepState);
                 var act = actions[action];
 
-                var prev = clone({
+                var prev = {
                     x: actor.x,
                     y: actor.y
-                });
+                };
 
                 actor.x += act.dx;
                 actor.y += act.dy;
@@ -419,69 +524,62 @@ module.exports = {
                 if (actor.student) {
                     actor.withoutFood++;
                 }
-                if (actor.x == actor.target.x && actor.y == actor.target.y) {
+
+                if (isFood(actor.x, actor.y)) {
+                    removeFood({ x: actor.x, y: actor.y });
                     growSnake(actor);
                     if (actor.student) {
                         actor.withoutFood = 0;
+                        scene.result.wins++;
                     }
                     toRespawn = true;
-                    if (instanceProps.mode === 'server' && actor.student) {
+                    if (actor.student) {
                         var availActions = actions.reduce(function (result, next) {
                             return isWall(scene.actor.x + next.dx, scene.actor.y + next.dy) ? result : result + 1;
                         }, 0);
                         if (availActions > 0) {
-                            scene.agent.learn(1);
+                            teachAgent(1);
                         } else {
+                            teachAgent(-2);
                             restartActor(-1);
-                            scene.agent.learn(-2);
                             return;
                         }
                     }
                 } else if (isWall(actor.x, actor.y)) {
                     if (actor.student) {
                         footer = 'WALL';
+                        teachAgent(-1);
                         restartActor(-1);
-
-                        if (instanceProps.mode === 'server') {
-                            scene.agent.learn(-1);
-                        }
                     } else {
                         actor.active = false;
                     }
                 } else {
                     if (actor.student) {
-                        if (actor.withoutFood > scene.maxX * (scene.maxX / 3)) {
-                            restartActor(-1);
-                            if (instanceProps.mode === 'server') {
-                                scene.agent.learn(-1);
+                        if (actor.withoutFood > Math.min(100, scene.maxX * (scene.maxY / 3)) + actor.tail.length * 2) {
+                            teachAgent(-1);
+                            if (!shrinkSnake(actor)) {
+                                restartActor(-1);
                             }
-                            return;
+                        } else {
+                            teachAgent(0);
                         }
                     }
-                    if (instanceProps.mode === 'server' && actor.student) {
-                        scene.agent.learn(0);
-                    }
                 }
-
                 actor.tail = actor.tail.map(function (one) {
                     if (one.wait > 0) {
                         one.wait--;
                         return one;
                     } else {
-                        var next = clone({
+                        var next = {
                             x: one.x,
                             y: one.y
-                        });
+                        };
                         one.x = prev.x;
                         one.y = prev.y;
-                        prev = clone(next);
+                        prev = next;
                     }
                     return one;
                 });
-
-                if (toRespawn) {
-                    respawnFood(actor);
-                }
             });
         };
 
@@ -498,16 +596,23 @@ module.exports = {
         };
 
         var resizeTo = function resizeTo(maxX, maxY) {
-            scene.maxX = maxX;
-            scene.maxY = maxY;
+            if (scene.level) {
+                scene.maxX = scene.level.maxX;
+                scene.maxY = scene.level.maxY;
+            } else {
+                scene.maxX = maxX;
+                scene.maxY = maxY;
+            }
             scene.params.maxX = maxX;
             scene.params.maxY = maxY;
             for (var x = 0; x <= scene.maxX; x++) {
                 if (!walls[x]) {
                     walls[x] = {};
+                    foods[x] = {};
                 }
                 for (var y = 0; y <= scene.maxY; y++) {
                     walls[x][y] = false;
+                    foods[x][y] = false;
                 }
             }
             buildWalls();
@@ -517,20 +622,21 @@ module.exports = {
             if (instanceProps.mode === 'client') {
                 return;
             }
-            console.log('H: ', scene.actor.x, ',', scene.actor.y, ' T: ', scene.actor.tail.length); //, scene.actor, scene.actor.tail)
+            console.log('F: ' + scene.food.length + ', H: ', scene.actor.x, ',', scene.actor.y, ' T: ', scene.actor.tail.length); //, scene.actor, scene.actor.tail)
             var row = '';
             console.log('-------- ' + scene.maxX + 'x' + scene.maxY + ' -------');
-            for (var x = 0; x <= scene.maxX; x++) {
+            for (var y = 0; y <= scene.maxY; y++) {
                 row = '';
-                for (var y = 0; y <= scene.maxY; y++) {
+                for (var x = 0; x <= scene.maxX; x++) {
                     var c = '.';
 
                     if (isWall(x, y)) {
                         c = 'w';
                     }
 
-                    if (x == scene.target.x && y == scene.target.y) {
-                        c = 'f';
+                    if (isFood(x, y)) {
+                        //x == scene.target.x && y == scene.target.y) {
+                        c = 'F';
                     }
 
                     if (x == scene.actor.x && y == scene.actor.y) {
@@ -543,6 +649,21 @@ module.exports = {
             }
         };
 
+        var loadLevel = function loadLevel(levelName) {
+            scene.spec.rivals = 0;
+            var level = false;
+            if (levelName === 'random') {
+                level = academy.levels[randNum(academy.levels.length)];
+            } else {
+                level = academy.levels.filter(function (one) {
+                    return one.name === levelName;
+                })[0];
+            }
+            scene.level = level;
+            resizeTo(level.maxX - 1, level.maxY - 1);
+            respawnFood(scene.actor);
+        };
+
         return {
             scene: scene,
             calculateMaxNumInputs: calculateMaxNumInputs,
@@ -550,12 +671,16 @@ module.exports = {
             initRivals: initRivals,
             restartActor: restartActor,
             growSnake: growSnake,
+            shrinkSnake: shrinkSnake,
             isWall: isWall,
             clone: clone,
             nextStep: nextStep,
             generateID: generateID,
             printField: printField,
             resizeTo: resizeTo,
+            loadLevel: loadLevel,
+            walls: walls,
+            foods: foods,
             initAgents: initAgents,
             implantBrain: implantBrain
         };

@@ -23,7 +23,7 @@ class CreateModelDialog extends React.Component<Props, State> {
     state = {
         open: false,
         form: {
-            features: ['1', '2', '4']
+            features: ['1', '2', '3', '7', '10']
         } as any
     };
 

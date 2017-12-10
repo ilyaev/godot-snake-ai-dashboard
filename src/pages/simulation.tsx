@@ -50,10 +50,10 @@ class SimulationDialog extends React.Component<Props, State> {
         this.snake = require('../common/snake-scene').instance({
             mode: 'client'
         });
-        model.maxX = size;
-        model.maxY = size;
-        model.params.maxX = size;
-        model.params.maxY = size;
+        model.maxX = 29; // size;
+        model.maxY = 18; // size;
+        model.params.maxX = model.maxX;
+        model.params.maxY = model.maxY;
         this.snake.scene.spec = model.spec;
         this.snake.scene.spec.rivals = (Math.floor(size / 7) - 1) * 2;
         this.snake.scene.params = model.params;
@@ -62,11 +62,13 @@ class SimulationDialog extends React.Component<Props, State> {
         this.snake.scene.modelName = this.props.model;
         this.snake.initScene();
         this.snake.initAgents(this.snake.scene.env, this.snake.scene.spec);
-        this.snake.implantBrain(model.brain);
         this.snake.scene.agent.epsilon = 0.0001;
         this.snake.scene.rivalAgent.epsilon = 0.0001;
+        this.snake.loadLevel('random');
+        // this.snake.initScene();
+        this.snake.implantBrain(model.brain);
         this.setState({ loading: false, model: model, turn: 1 });
-        this.runSimulation(Math.round(100 / (size / 7)));
+        this.runSimulation(50);
     }
 
     runSimulation(speed: number) {
@@ -116,6 +118,8 @@ class SimulationDialog extends React.Component<Props, State> {
                             actor={this.snake.scene.actor}
                             rivals={this.snake.scene.rivals}
                             food={this.snake.scene.target}
+                            walls={this.snake.walls}
+                            foods={this.snake.foods}
                             turn={this.state.turn}
                             onSizeChange={size => this.onSizeChange(size)}
                         />

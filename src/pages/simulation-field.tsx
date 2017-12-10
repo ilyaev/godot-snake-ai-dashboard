@@ -8,6 +8,8 @@ type Props = {
     rivals: any[];
     food: any;
     turn: number;
+    walls: any[];
+    foods: any[];
     onSizeChange: (size: number) => void;
 };
 
@@ -44,7 +46,32 @@ class SimulationField extends React.Component<Props, State> {
         this.context.save();
         this.drawGrid();
         this.drawActors();
+        this.drawDebug();
         this.context.restore();
+    }
+
+    drawDebug() {
+        const from = this.getCellCenter(this.props.actor.x, this.props.actor.y);
+        var to = { x: 0, y: 0 };
+        try {
+            to = this.getCellCenter(this.props.actor.target.x, this.props.actor.target.y);
+        } catch (e) {
+            console.log('ERROR: actor - ', JSON.stringify(this.props.actor));
+        }
+        this.context.save();
+        this.context.strokeStyle = '#FF0000';
+        this.context.beginPath();
+        this.context.moveTo(from.x, from.y);
+        this.context.lineTo(to.x, to.y);
+        this.context.stroke();
+        this.context.restore();
+    }
+
+    getCellCenter(x: any, y: any) {
+        return {
+            x: x * this.cellSize + this.cellSize / 2,
+            y: y * this.cellSize + this.cellSize / 2
+        };
     }
 
     drawGrid() {
@@ -55,6 +82,12 @@ class SimulationField extends React.Component<Props, State> {
                 const nX = x * this.cellSize;
                 const nY = y * this.cellSize;
                 this.context.strokeRect(nX, nY, this.cellSize, this.cellSize);
+                if (this.props.walls[x][y]) {
+                    this.drawRect(x, y, 'gray');
+                }
+                if (this.props.foods[x][y]) {
+                    this.drawRect(x, y, 'red');
+                }
             }
         }
         this.context.restore();
@@ -62,9 +95,9 @@ class SimulationField extends React.Component<Props, State> {
 
     drawActor(actor: any) {
         this.context.save();
-        if (actor.target) {
-            this.drawRect(actor.target.x, actor.target.y, 'red');
-        }
+        // if (actor.target) {
+        //     this.drawRect(actor.target.x, actor.target.y, 'red');
+        // }
         this.drawRect(actor.x, actor.y, '#006400');
         var color = 'green';
         if (typeof actor.student !== 'undefined' && !actor.student) {
