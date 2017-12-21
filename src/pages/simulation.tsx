@@ -50,21 +50,23 @@ class SimulationDialog extends React.Component<Props, State> {
         this.snake = require('../common/snake-scene').instance({
             mode: 'client'
         });
-        model.maxX = 29; // size;
-        model.maxY = 18; // size;
-        model.params.maxX = model.maxX;
-        model.params.maxY = model.maxY;
+
         this.snake.scene.spec = model.spec;
         this.snake.scene.spec.rivals = (Math.floor(size / 7) - 1) * 2;
         this.snake.scene.params = model.params;
-        this.snake.scene.maxX = model.maxX;
-        this.snake.scene.maxY = model.maxY;
+        // this.snake.scene.maxX = model.maxX;
+        // this.snake.scene.maxY = model.maxY;
         this.snake.scene.modelName = this.props.model;
         this.snake.initScene();
+        this.snake.loadLevel('random');
+        model.maxX = this.snake.scene.maxX;
+        model.maxY = this.snake.scene.maxY;
+        model.params.maxX = model.maxX;
+        model.params.maxY = model.maxY;
         this.snake.initAgents(this.snake.scene.env, this.snake.scene.spec);
         this.snake.scene.agent.epsilon = 0.0001;
         this.snake.scene.rivalAgent.epsilon = 0.0001;
-        this.snake.loadLevel('random');
+        // this.snake.loadLevel('random');
         // this.snake.initScene();
         this.snake.implantBrain(model.brain);
         this.setState({ loading: false, model: model, turn: 1 });
@@ -127,13 +129,10 @@ class SimulationDialog extends React.Component<Props, State> {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => this.onSizeChange(7)} color="primary" autoFocus>
-                        Small
-                    </Button>
-                    <Button onClick={() => this.onSizeChange(15)} color="primary" autoFocus>
-                        Medium
+                        Alone
                     </Button>
                     <Button onClick={() => this.onSizeChange(30)} color="primary" autoFocus>
-                        Big
+                        Rivals
                     </Button>
                     <Button onClick={this.handleClickOk} color="primary" autoFocus>
                         Close

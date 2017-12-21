@@ -108,7 +108,7 @@ class SimulationField extends React.Component<Props, State> {
     }
 
     drawActors() {
-        this.drawRect(this.props.food.x, this.props.food.y, 'red');
+        // this.drawRect(this.props.food.x, this.props.food.y, 'red');
         [this.props.actor]
             .concat(this.props.rivals)
             .filter(one => typeof one.active === 'undefined' || one.active)

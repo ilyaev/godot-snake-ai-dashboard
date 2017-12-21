@@ -27,6 +27,7 @@ var FEATURE_TAIL_SIZE = 7;
 var FEATURE_HUNGER = 8;
 var FEATURE_FULL_MAP_4 = 9;
 var FEATURE_FULL_MAP_6 = 10;
+var FEATURE_CLOSEST_FOOD_ANGLE = 11;
 var academy = require('./levels');
 
 var binmap = [1, 2, 4, 8, 16, 32, 64, 128];
@@ -35,6 +36,8 @@ var featureMap = (_featureMap = {}, _defineProperty(_featureMap, FEATURE_HEAD_CO
     inputs: 2
 }), _defineProperty(_featureMap, FEATURE_CLOSEST_FOOD_DICRECTION, {
     inputs: 2
+}), _defineProperty(_featureMap, FEATURE_CLOSEST_FOOD_ANGLE, {
+    inputs: 1
 }), _defineProperty(_featureMap, FEATURE_TAIL_DIRECTION, {
     inputs: 2
 }), _defineProperty(_featureMap, FEATURE_VISION_CLOSE_RANGE, {
@@ -78,7 +81,7 @@ var config = {
         }]
     },
     food: [],
-    maxFood: 10,
+    maxFood: 1,
     level: false,
     rivals: [],
     target: {
@@ -214,6 +217,7 @@ module.exports = {
             scene.result.wins = 0;
             scene.result.step = 0;
             scene.result.epoch = 0;
+            restartActor(-1);
             initRivals();
         };
 
@@ -273,8 +277,9 @@ module.exports = {
             scene.result.epoch += 1;
             scene.actor.step = 0;
             scene.food = [];
-            respawnFood(scene.actor);
-            scene.actor.target = scene.food[randNum(scene.food.length)];
+            respawnFood(scene.actor, true);
+            scene.actor.target = clone(scene.food[0]);
+            scene.target = clone(scene.food[0]);
         };
 
         var getNextFood = function getNextFood() {
@@ -293,7 +298,7 @@ module.exports = {
 
         var removeFood = function removeFood(food) {
             scene.food = scene.food.filter(function (one) {
-                return one.x !== food.x || one.y != food.y;
+                return one.x !== food.x || one.y !== food.y;
             });
             while (scene.food.length < scene.maxFood) {
                 respawnFood(false);
@@ -301,12 +306,15 @@ module.exports = {
         };
 
         var respawnFood = function respawnFood(actor) {
+            var pure = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+
             var food = getNextFood();
-            if (actor) {
+            if (actor && !pure) {
                 if (actor.student) {
                     removeFood(scene.target, actor);
                     scene.target.x = food.x;
                     scene.target.y = food.y;
+                    actor.target = scene.target;
                     //console.log('---eaten by player')
                 } else {
                     removeFood(actor.target, actor);
@@ -453,6 +461,13 @@ module.exports = {
                             result.push((scene.target.y - actor.y) / scene.maxY);
                         }
                         break;
+                    case FEATURE_CLOSEST_FOOD_ANGLE:
+                        if (!actor.target) {
+                            actor.target = scene.target;
+                        }
+                        var hip = Math.sqrt(Math.pow(actor.target.x - actor.x, 2) + Math.pow(actor.target.y - actor.y, 2));
+                        result.push((actor.target.x - actor.x) / hip);
+                        break;
                     case FEATURE_VISION_CLOSE_RANGE:
                         ;[0, 1, 2, 3].forEach(function (direction) {
                             return result.push(isFutureWall(direction, actor));
@@ -526,6 +541,7 @@ module.exports = {
                 }
 
                 if (isFood(actor.x, actor.y)) {
+                    var ownFood = actor.x === actor.target.x && actor.y === actor.target.y;
                     removeFood({ x: actor.x, y: actor.y });
                     growSnake(actor);
                     if (actor.student) {
@@ -538,9 +554,9 @@ module.exports = {
                             return isWall(scene.actor.x + next.dx, scene.actor.y + next.dy) ? result : result + 1;
                         }, 0);
                         if (availActions > 0) {
-                            teachAgent(1);
+                            teachAgent(ownFood ? 10 : 1);
                         } else {
-                            teachAgent(-2);
+                            teachAgent(-10);
                             restartActor(-1);
                             return;
                         }
@@ -597,8 +613,8 @@ module.exports = {
 
         var resizeTo = function resizeTo(maxX, maxY) {
             if (scene.level) {
-                scene.maxX = scene.level.maxX;
-                scene.maxY = scene.level.maxY;
+                scene.maxX = scene.level.maxX - 1;
+                scene.maxY = scene.level.maxY - 1;
             } else {
                 scene.maxX = maxX;
                 scene.maxY = maxY;
@@ -660,8 +676,12 @@ module.exports = {
                 })[0];
             }
             scene.level = level;
+            scene.maxFood = level.maxFood || 1;
             resizeTo(level.maxX - 1, level.maxY - 1);
-            respawnFood(scene.actor);
+            scene.food = [];
+            respawnFood(scene.actor, true);
+            scene.actor.target = clone(scene.food[0]);
+            scene.target = clone(scene.food[0]);
         };
 
         return {
