@@ -17,6 +17,8 @@ type State = {
 
 export type ModelType = {
     name: string;
+    params: any;
+    spec: any;
     archive: boolean;
     worker: any;
 };
@@ -182,7 +184,8 @@ class ModelCard extends React.Component<Props, State> {
         return (
             <Toolbar>
                 <Typography type="title" color="inherit">
-                    {this.props.model.name}
+                    {this.props.model.name} / {this.props.model.params.homelevel || 'random'} /{' '}
+                    {this.props.model.spec.epsilon || '-'}
                 </Typography>
                 {this.props.model.worker.active ? null : (
                     <IconButton

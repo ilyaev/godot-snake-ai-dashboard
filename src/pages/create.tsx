@@ -5,6 +5,10 @@ import TextField from 'material-ui/TextField';
 import { FormLabel, FormControl, FormGroup, FormControlLabel } from 'material-ui/Form';
 import Checkbox from 'material-ui/Checkbox';
 import { featureMap } from './const';
+import Select from 'material-ui/Select';
+import Input, { InputLabel } from 'material-ui/Input';
+import { MenuItem } from 'material-ui/Menu';
+import { levels } from '../common/levels';
 
 type Props = {
     caption?: string;
@@ -23,7 +27,8 @@ class CreateModelDialog extends React.Component<Props, State> {
     state = {
         open: false,
         form: {
-            features: ['1', '2', '3', '7', '10']
+            features: ['2', '10'],
+            level: ''
         } as any
     };
 
@@ -54,11 +59,37 @@ class CreateModelDialog extends React.Component<Props, State> {
         this.setState({ form } as any);
     };
 
+    handleLevelChange = (event: any) => {
+        let form = this.state.form;
+        form.level = event.target.value;
+        this.setState({ form: Object.assign({}, form) } as any);
+    };
+
     render() {
         return (
             <Dialog fullWidth={true} open={this.props.open} onRequestClose={this.handleClickCancel}>
                 <DialogTitle>Create New Model</DialogTitle>
                 <DialogContent>
+                    <FormControl style={{ width: '300px', marginBottom: '-10px' }}>
+                        <InputLabel htmlFor="age-simple">Training Level</InputLabel>
+                        <Select
+                            value={this.state.form.level}
+                            onChange={this.handleLevelChange}
+                            input={<Input name="level" id="age-simple" />}
+                        >
+                            <MenuItem value="">
+                                <em>None</em>
+                            </MenuItem>
+                            {levels.map(level => {
+                                return (
+                                    <MenuItem value={level.name} key={level.name}>
+                                        {level.name}
+                                    </MenuItem>
+                                );
+                            })}
+                        </Select>
+                    </FormControl>
+
                     <TextField
                         id="name"
                         label="Name"
@@ -67,6 +98,7 @@ class CreateModelDialog extends React.Component<Props, State> {
                         onChange={this.handleChange('name')}
                         margin="normal"
                     />
+
                     <FormControl component="fieldset" style={{ marginTop: '10px' }}>
                         <FormLabel>Input features</FormLabel>
                         <FormGroup>

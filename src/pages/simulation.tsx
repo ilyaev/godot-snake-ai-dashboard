@@ -58,7 +58,7 @@ class SimulationDialog extends React.Component<Props, State> {
         // this.snake.scene.maxY = model.maxY;
         this.snake.scene.modelName = this.props.model;
         this.snake.initScene();
-        this.snake.loadLevel('random');
+        this.snake.loadLevel(this.snake.scene.params.homelevel || 'random');
         model.maxX = this.snake.scene.maxX;
         model.maxY = this.snake.scene.maxY;
         model.params.maxX = model.maxX;

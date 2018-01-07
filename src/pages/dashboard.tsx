@@ -272,7 +272,8 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
         this.socket.send({
             cmd: 'CREATE_MODEL',
             features: form.features,
-            name: form.name
+            name: form.name,
+            level: form.level
         });
     }
 
