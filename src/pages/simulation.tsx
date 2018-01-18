@@ -64,13 +64,13 @@ class SimulationDialog extends React.Component<Props, State> {
         model.params.maxX = model.maxX;
         model.params.maxY = model.maxY;
         this.snake.initAgents(this.snake.scene.env, this.snake.scene.spec);
-        this.snake.scene.agent.epsilon = 0.0001;
-        this.snake.scene.rivalAgent.epsilon = 0.0001;
+        this.snake.scene.agent.epsilon = 0.05;
+        this.snake.scene.rivalAgent.epsilon = 0.05;
         // this.snake.loadLevel('random');
         // this.snake.initScene();
         this.snake.implantBrain(model.brain);
         this.setState({ loading: false, model: model, turn: 1 });
-        this.runSimulation(50);
+        this.runSimulation(70);
     }
 
     runSimulation(speed: number) {

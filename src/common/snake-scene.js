@@ -69,7 +69,16 @@ var config = {
         homelevel: '',
         features: [FEATURE_HEAD_COORDINATES, FEATURE_CLOSEST_FOOD_DICRECTION, FEATURE_VISION_CLOSE_RANGE]
     },
-    spec: { alpha: 0.02, epsilon: 0.5, learning_steps_per_iteration: 40, experience_size: 10000, gamma: 0.75, rivals: 0, size: 7 },
+    spec: {
+        alpha: 0.02,
+        epsilon: 0.5,
+        learningStepsPerIteration: 20,
+        experienceSize: 10000,
+        gamma: 0.9,
+        rivals: 0,
+        size: 7,
+        experienceAddEvery: 1
+    },
     actor: {
         x: 3,
         y: 3,
@@ -98,7 +107,11 @@ var config = {
             p: 0,
             t: 0,
             s: 0
-        }]
+        }],
+        tail: {
+            size: 0,
+            epoch: 0
+        }
     },
     qvalues: {},
     history: [],
@@ -132,7 +145,9 @@ module.exports = {
 
         instanceProps = Object.assign({
             mode: 'server',
-            debug: true
+            debug: true,
+            test: false,
+            onProgress: false
         }, instanceProps);
 
         var scene = clone(config);
@@ -218,7 +233,7 @@ module.exports = {
             scene.result.wins = 0;
             scene.result.step = 0;
             scene.result.epoch = 0;
-            restartActor(-1);
+            restartActor(-1, 'init');
             initRivals();
         };
 
@@ -253,12 +268,31 @@ module.exports = {
             scene.result.history[period] = scene.result.history[period].splice(-100);
         };
 
-        var restartActor = function restartActor(reward) {
-            scene.history.push({
+        var restartActor = function restartActor(reward, reason) {
+            if (instanceProps.test) {
+                scene.actor.tail.length > 2 && console.log('RS:', reward, reason, scene.result.epoch, scene.actor.step, scene.actor.tail.length, scene.agent.epsilon);
+            }
+            var historyRecord = {
                 size: scene.actor.tail.length,
                 step: scene.actor.step,
                 epoch: scene.result.epoch
-            });
+            };
+
+            if (!scene.result.tail) {
+                scene.result.tail = {
+                    size: 0
+                };
+            }
+
+            if (historyRecord.size > scene.result.tail.size) {
+                scene.result.tail = historyRecord;
+                if (instanceProps.onProgress) {
+                    var cb = instanceProps.onProgress;
+                    cb(Object.assign({}, historyRecord, { e: scene.agent.epsilon }));
+                }
+            }
+
+            scene.history.push(historyRecord);
             scene.history = scene.history.splice(-1000);
             scene.actor = clone(scene.defaultActor);
             var place = getNextRivalPlace();
@@ -443,6 +477,11 @@ module.exports = {
             });
         };
 
+        var limitDistanceToFood = function limitDistanceToFood(dist) {
+            var limit = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 8;
+            return Math.min(limit, Math.max(dist, -1 * limit));
+        };
+
         var buildState = function buildState(actor) {
             var result = [];
             scene.params.features.map(function (one) {
@@ -455,11 +494,15 @@ module.exports = {
                         break;
                     case FEATURE_CLOSEST_FOOD_DICRECTION:
                         if (actor.target) {
-                            result.push((actor.target.x - actor.x) / scene.maxX);
-                            result.push((actor.target.y - actor.y) / scene.maxY);
+                            // result.push((actor.target.x - actor.x) / scene.maxX)
+                            // result.push((actor.target.y - actor.y) / scene.maxY)
+                            result.push(limitDistanceToFood(actor.target.x - actor.x) / 8);
+                            result.push(limitDistanceToFood(actor.target.y - actor.y) / 8);
                         } else {
-                            result.push((scene.target.x - actor.x) / scene.maxX);
-                            result.push((scene.target.y - actor.y) / scene.maxY);
+                            // result.push((scene.target.x - actor.x) / scene.maxX)
+                            // result.push((scene.target.y - actor.y) / scene.maxY)
+                            result.push(limitDistanceToFood(scene.target.x - actor.x) / 8);
+                            result.push(limitDistanceToFood(scene.target.y - actor.y) / 8);
                         }
                         break;
                     case FEATURE_CLOSEST_FOOD_ANGLE:
@@ -523,7 +566,14 @@ module.exports = {
                 //console.log(scene.params.features, calculateMaxNumInputs(scene.params.features))
                 //console.log(stepState.map(one => Math.round(one * 100) / 100))
 
-                var action = actor.student ? scene.agent.act(stepState) : scene.rivalAgent.act(stepState);
+                var availActions = actions.reduce(function (result, next, index) {
+                    if (!isWall(actor.x + next.dx, actor.y + next.dy)) {
+                        result.push(index);
+                    }
+                    return result;
+                }, []);
+
+                var action = actor.student ? scene.agent.act(stepState, availActions) : scene.rivalAgent.act(stepState, availActions);
                 var act = actions[action];
 
                 var prev = {
@@ -551,31 +601,24 @@ module.exports = {
                     }
                     toRespawn = true;
                     if (actor.student) {
-                        var availActions = actions.reduce(function (result, next) {
-                            return isWall(scene.actor.x + next.dx, scene.actor.y + next.dy) ? result : result + 1;
-                        }, 0);
-                        if (availActions > 0) {
-                            teachAgent(ownFood ? 10 : 1);
-                        } else {
-                            teachAgent(-10);
-                            restartActor(-1);
-                            return;
-                        }
+                        teachAgent(1);
                     }
                 } else if (isWall(actor.x, actor.y)) {
                     if (actor.student) {
                         footer = 'WALL';
-                        teachAgent(-1);
-                        restartActor(-1);
+                        teachAgent(-10);
+                        restartActor(-1, 'wall');
                     } else {
                         actor.active = false;
                     }
                 } else {
                     if (actor.student) {
-                        if (actor.withoutFood > Math.min(100, scene.maxX * (scene.maxY / 3)) + actor.tail.length * 2) {
-                            teachAgent(-1);
-                            if (!shrinkSnake(actor)) {
-                                restartActor(-1);
+                        var maxWithoutFood = Math.max(100, scene.maxX * scene.maxY / 3) + actor.tail.length * 2;
+                        if (actor.withoutFood > maxWithoutFood) {
+                            teachAgent(-10);
+                            restartActor(-1, 'starve');
+                            if (instanceProps.test) {
+                                console.log('STARVE');
                             }
                         } else {
                             teachAgent(0);
@@ -703,7 +746,20 @@ module.exports = {
             walls: walls,
             foods: foods,
             initAgents: initAgents,
-            implantBrain: implantBrain
+            implantBrain: implantBrain,
+            inputs: {
+                FEATURE_HEAD_COORDINATES: FEATURE_HEAD_COORDINATES,
+                FEATURE_CLOSEST_FOOD_DICRECTION: FEATURE_CLOSEST_FOOD_DICRECTION,
+                FEATURE_TAIL_DIRECTION: FEATURE_TAIL_DIRECTION,
+                FEATURE_VISION_CLOSE_RANGE: FEATURE_VISION_CLOSE_RANGE,
+                FEATURE_VISION_FAR_RANGE: FEATURE_VISION_FAR_RANGE,
+                FEATURE_VISION_MID_RANGE: FEATURE_VISION_MID_RANGE,
+                FEATURE_TAIL_SIZE: FEATURE_TAIL_SIZE,
+                FEATURE_HUNGER: FEATURE_HUNGER,
+                FEATURE_FULL_MAP_4: FEATURE_FULL_MAP_4,
+                FEATURE_FULL_MAP_6: FEATURE_FULL_MAP_6,
+                FEATURE_CLOSEST_FOOD_ANGLE: FEATURE_CLOSEST_FOOD_ANGLE
+            }
         };
     }
 };
