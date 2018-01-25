@@ -5,6 +5,11 @@ import Slider from 'rc-slider';
 import 'rc-slider/assets/index.css';
 import Typography from 'material-ui/Typography';
 import { featureMap } from './const';
+import { FormControl } from 'material-ui/Form';
+import Select from 'material-ui/Select';
+import Input, { InputLabel } from 'material-ui/Input';
+import { MenuItem } from 'material-ui/Menu';
+import { levels } from '../common/levels';
 
 type Props = {
     caption?: string;
@@ -50,8 +55,20 @@ class ModelSpecDialog extends React.Component<Props, State> {
         if (!form.size) {
             form.size = 7;
         }
+        if (!form.level) {
+            form.level = this.props.worker.params.homelevel || 'empty8x8';
+        }
         this.setState({ form });
     }
+
+    handleLevelChange = (event: any) => {
+        const level = event.target.value;
+        let form = this.state.form;
+        form.level = level;
+        this.setState({
+            form
+        } as any);
+    };
 
     render() {
         const style = { marginTop: '20px', marginBottom: '20px' };
@@ -69,24 +86,25 @@ class ModelSpecDialog extends React.Component<Props, State> {
             <Dialog fullWidth={true} open={this.props.open} onRequestClose={this.handleClickCancel}>
                 <DialogTitle>Model Spec</DialogTitle>
                 <DialogContent>
-                    <Typography type="caption" color="inherit">
-                        {'Field Size'}
-                    </Typography>
-                    <Slider
-                        style={style}
-                        value={this.state.form.size}
-                        defaultValue={7}
-                        min={7}
-                        max={28}
-                        step={7}
-                        onChange={this.handleChange('size')}
-                        marks={{
-                            '28': {
-                                label: <strong>{this.state.form.size}</strong>
-                            }
-                        }}
-                        handleStyle={handleStyle}
-                    />
+                    <FormControl style={{ width: '100%', marginBottom: '15px' }}>
+                        <InputLabel htmlFor="age-simple">Training Level</InputLabel>
+                        <Select
+                            value={this.state.form.level || ''}
+                            onChange={this.handleLevelChange}
+                            input={<Input name="level" id="age-simple" />}
+                        >
+                            <MenuItem value="">
+                                <em>None</em>
+                            </MenuItem>
+                            {levels.map(level => {
+                                return (
+                                    <MenuItem value={level.name} key={level.name}>
+                                        {level.name}
+                                    </MenuItem>
+                                );
+                            })}
+                        </Select>
+                    </FormControl>
                     <Typography type="caption" color="inherit">
                         {'Epsilon (Exploration rate)'}
                     </Typography>

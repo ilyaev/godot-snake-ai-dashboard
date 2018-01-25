@@ -10,6 +10,7 @@ type Props = {
     turn: number;
     walls: any[];
     foods: any[];
+    toggleWall: (x: number, y: number) => void;
     onSizeChange: (size: number) => void;
 };
 
@@ -22,6 +23,9 @@ class SimulationField extends React.Component<Props, State> {
     height = 100;
     cellSize = 0;
     context: any;
+    canvas: any;
+    mouseDown: boolean;
+    lastCell: any;
 
     recalcDimensions() {
         this.context = (ReactDOM.findDOMNode(this) as any).getContext('2d');
@@ -93,11 +97,24 @@ class SimulationField extends React.Component<Props, State> {
         this.context.restore();
     }
 
+    handleCanvasClick(event: React.MouseEvent<HTMLCanvasElement>) {
+        const rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
+        const px = event.clientX - rect.left,
+            py = event.clientY - rect.top;
+
+        const x = Math.floor(px / this.cellSize);
+        const y = Math.floor(py / this.cellSize);
+
+        if (this.lastCell !== x + '-' + y) {
+            this.props.toggleWall(x, y);
+            this.lastCell = x + '-' + y;
+        }
+
+        return null;
+    }
+
     drawActor(actor: any) {
         this.context.save();
-        // if (actor.target) {
-        //     this.drawRect(actor.target.x, actor.target.y, 'red');
-        // }
         this.drawRect(actor.x, actor.y, '#006400');
         var color = 'green';
         if (typeof actor.student !== 'undefined' && !actor.student) {
@@ -108,7 +125,6 @@ class SimulationField extends React.Component<Props, State> {
     }
 
     drawActors() {
-        // this.drawRect(this.props.food.x, this.props.food.y, 'red');
         [this.props.actor]
             .concat(this.props.rivals)
             .filter(one => typeof one.active === 'undefined' || one.active)
@@ -123,7 +139,20 @@ class SimulationField extends React.Component<Props, State> {
     }
 
     render() {
-        return <canvas style={{ alignSelf: 'center' }} width={this.width} height={this.height} />;
+        return (
+            <canvas
+                style={{ alignSelf: 'center' }}
+                width={this.width}
+                height={this.height}
+                onMouseDown={event => {
+                    this.mouseDown = true;
+                    this.handleCanvasClick(event);
+                }}
+                onMouseUp={event => (this.mouseDown = false)}
+                onMouseLeave={event => (this.mouseDown = false)}
+                onMouseMove={event => this.mouseDown && this.handleCanvasClick(event)}
+            />
+        );
     }
 }
 

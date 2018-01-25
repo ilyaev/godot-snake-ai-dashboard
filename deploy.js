@@ -20,3 +20,5 @@ fs.readdir(dir, function(err, items) {
         console.log('--- deployed ---');
     });
 });
+
+// && cp ../godot-snake/export/levels.js ../godot-snake-ai-trainer/src/common/levels.js",

@@ -17,6 +17,7 @@ type State = {
     model: any;
     open: boolean;
     turn: number;
+    walls: any;
 };
 
 class SimulationDialog extends React.Component<Props, State> {
@@ -24,7 +25,8 @@ class SimulationDialog extends React.Component<Props, State> {
         open: false,
         loading: true,
         turn: 1,
-        model: {} as any
+        model: {} as any,
+        walls: {} as any
     };
 
     snake: any = {} as any;
@@ -43,7 +45,7 @@ class SimulationDialog extends React.Component<Props, State> {
         });
     }
 
-    initSnake(model: any, size: number) {
+    initSnake(model: any, size: number, clearWalls: boolean = false) {
         this.model = model;
         this.size = size;
         delete this.snake;
@@ -51,11 +53,14 @@ class SimulationDialog extends React.Component<Props, State> {
             mode: 'client'
         });
 
+        this.setState({ walls: this.snake.walls });
+
         this.snake.scene.spec = model.spec;
+        if (clearWalls) {
+            this.snake.clearCustomWalls();
+        }
         this.snake.scene.spec.rivals = (Math.floor(size / 7) - 1) * 2;
         this.snake.scene.params = model.params;
-        // this.snake.scene.maxX = model.maxX;
-        // this.snake.scene.maxY = model.maxY;
         this.snake.scene.modelName = this.props.model;
         this.snake.initScene();
         this.snake.loadLevel(this.snake.scene.params.homelevel || 'random');
@@ -64,13 +69,11 @@ class SimulationDialog extends React.Component<Props, State> {
         model.params.maxX = model.maxX;
         model.params.maxY = model.maxY;
         this.snake.initAgents(this.snake.scene.env, this.snake.scene.spec);
-        this.snake.scene.agent.epsilon = 0.05;
-        this.snake.scene.rivalAgent.epsilon = 0.05;
-        // this.snake.loadLevel('random');
-        // this.snake.initScene();
+        this.snake.scene.agent.epsilon = 0.0001;
+        this.snake.scene.rivalAgent.epsilon = 0.0001;
         this.snake.implantBrain(model.brain);
         this.setState({ loading: false, model: model, turn: 1 });
-        this.runSimulation(70);
+        this.runSimulation(20);
     }
 
     runSimulation(speed: number) {
@@ -85,7 +88,7 @@ class SimulationDialog extends React.Component<Props, State> {
             .sendCommand({ cmd: 'LOAD_MODEL', model: this.props.model, await: 'LOAD_MODEL' })
             .then((response: any) => {
                 const model = response.model;
-                this.initSnake(model, model.maxX);
+                this.initSnake(model, model.maxX, true);
             })
             .catch(e => console.log(e));
     }
@@ -124,6 +127,9 @@ class SimulationDialog extends React.Component<Props, State> {
                             foods={this.snake.foods}
                             turn={this.state.turn}
                             onSizeChange={size => this.onSizeChange(size)}
+                            toggleWall={(x, y) => {
+                                this.snake.setWall(x, y, !this.snake.isWall(x, y));
+                            }}
                         />
                     )}
                 </DialogContent>
