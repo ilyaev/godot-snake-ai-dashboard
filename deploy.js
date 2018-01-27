@@ -1,6 +1,7 @@
 var fs = require('fs-extra');
 var path = require('path');
 var dir = './build/static/js';
+var exec = require('child_process').exec;
 
 var dest = path.resolve(__dirname, '../godot-snake-ai-trainer/dist/app/dashboard/static/js');
 var indexPath = path.resolve(__dirname, '../godot-snake-ai-trainer/dist/app/dashboard');
@@ -21,4 +22,5 @@ fs.readdir(dir, function(err, items) {
     });
 });
 
-// && cp ../godot-snake/export/levels.js ../godot-snake-ai-trainer/src/common/levels.js",
+exec('cp ../godot-snake/export/levels.js ./src/common/levels.js');
+exec('cp ../godot-snake/export/levels.js ../godot-snake-ai-trainer/src/common/levels.js');

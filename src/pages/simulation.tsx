@@ -64,15 +64,19 @@ class SimulationDialog extends React.Component<Props, State> {
         this.snake.scene.modelName = this.props.model;
         this.snake.initScene();
         this.snake.loadLevel(this.snake.scene.params.homelevel || 'random');
+        this.snake.restartActor(-1, 'init');
         model.maxX = this.snake.scene.maxX;
         model.maxY = this.snake.scene.maxY;
         model.params.maxX = model.maxX;
         model.params.maxY = model.maxY;
         this.snake.initAgents(this.snake.scene.env, this.snake.scene.spec);
-        this.snake.scene.agent.epsilon = 0.0001;
-        this.snake.scene.rivalAgent.epsilon = 0.0001;
+        this.snake.scene.agent.epsilon = 0;
+        this.snake.scene.rivalAgent.epsilon = 0;
         this.snake.implantBrain(model.brain);
         this.setState({ loading: false, model: model, turn: 1 });
+        // if (clearWalls) {
+        //     this.snake.initRivals(3);
+        // }
         this.runSimulation(20);
     }
 
@@ -125,6 +129,7 @@ class SimulationDialog extends React.Component<Props, State> {
                             food={this.snake.scene.target}
                             walls={this.snake.walls}
                             foods={this.snake.foods}
+                            pits={this.snake.pits}
                             turn={this.state.turn}
                             onSizeChange={size => this.onSizeChange(size)}
                             toggleWall={(x, y) => {

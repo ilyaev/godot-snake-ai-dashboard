@@ -10,6 +10,7 @@ type Props = {
     turn: number;
     walls: any[];
     foods: any[];
+    pits: any[];
     toggleWall: (x: number, y: number) => void;
     onSizeChange: (size: number) => void;
 };
@@ -91,6 +92,9 @@ class SimulationField extends React.Component<Props, State> {
                 }
                 if (this.props.foods[x][y]) {
                     this.drawRect(x, y, 'red');
+                }
+                if (this.props.pits[x][y]) {
+                    this.drawRect(x, y, 'MediumPurple');
                 }
             }
         }

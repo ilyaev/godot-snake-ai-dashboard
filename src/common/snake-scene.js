@@ -28,6 +28,8 @@ var FEATURE_HUNGER = 8;
 var FEATURE_FULL_MAP_4 = 9;
 var FEATURE_FULL_MAP_6 = 10;
 var FEATURE_CLOSEST_FOOD_ANGLE = 11;
+var FEATURE_FULL_MAP_12 = 12;
+var FEATURE_BODY_MASS_DIRECTION = 13;
 var academy = require('./levels');
 
 var binmap = [1, 2, 4, 8, 16, 32, 64, 128];
@@ -41,6 +43,8 @@ var featureMap = (_featureMap = {}, _defineProperty(_featureMap, FEATURE_HEAD_CO
     inputs: 2
 }), _defineProperty(_featureMap, FEATURE_CLOSEST_FOOD_DICRECTION, {
     inputs: 4
+}), _defineProperty(_featureMap, FEATURE_BODY_MASS_DIRECTION, {
+    inputs: 2
 }), _defineProperty(_featureMap, FEATURE_CLOSEST_FOOD_ANGLE, {
     inputs: 1
 }), _defineProperty(_featureMap, FEATURE_TAIL_DIRECTION, {
@@ -59,6 +63,8 @@ var featureMap = (_featureMap = {}, _defineProperty(_featureMap, FEATURE_HEAD_CO
     inputs: 16
 }), _defineProperty(_featureMap, FEATURE_FULL_MAP_6, {
     inputs: 36
+}), _defineProperty(_featureMap, FEATURE_FULL_MAP_12, {
+    inputs: 144
 }), _featureMap);
 
 var config = {
@@ -98,6 +104,7 @@ var config = {
     food: [],
     maxFood: 1,
     level: false,
+    pits: [],
     rivals: [],
     target: {
         x: 1,
@@ -164,6 +171,7 @@ module.exports = {
 
         var walls = {};
         var foods = {};
+        var pits = {};
 
         var turns = [];
         var maxTurns = 1000;
@@ -177,14 +185,17 @@ module.exports = {
         var getNextRivalPlace = function getNextRivalPlace() {
             var cX = 1 + Math.round(Math.random() * (scene.maxX - 1));
             var cY = 1 + Math.round(Math.random() * (scene.maxY - 1));
-            while (Math.abs(cX - scene.actor.x) > 3 && Math.abs(cY - scene.actor.Y) > 3) {
-                cX = 1 + Math.round(Math.random() * (scene.maxX - 1));
-                cY = 1 + Math.round(Math.random() * (scene.maxY - 1));
+            if (scene.pits.length > 0) {
+                var place = scene.pits[Math.floor(Math.random() * scene.pits.length)];
+                cX = place.x;
+                cY = place.y;
             }
+
             return { cX: cX, cY: cY };
         };
 
-        var initRivals = function initRivals() {
+        var initRivals = function initRivals(maxRivals) {
+            scene.spec.rivals = maxRivals;
             scene.actor.student = true;
             scene.actor.active = true;
             var shift = 0;
@@ -193,7 +204,7 @@ module.exports = {
                 var place = getNextRivalPlace();
                 var x = place.cX;
                 var y = place.cY;
-                scene.rivals.push({
+                var rival = {
                     x: x,
                     y: y,
                     active: true,
@@ -207,7 +218,9 @@ module.exports = {
                         x: x - 1,
                         y: y
                     }]
-                });
+                };
+                respawnFood(rival);
+                scene.rivals.push(rival);
             }
         };
 
@@ -246,7 +259,6 @@ module.exports = {
             scene.result.step = 0;
             scene.result.epoch = 0;
             restartActor(-1, 'init');
-            initRivals();
         };
 
         var calculateAverage = function calculateAverage(period) {
@@ -275,20 +287,13 @@ module.exports = {
                 e: res.epoch,
                 p: period,
                 t: res.maxTail,
+                a: res.sumTail / period,
                 s: res.maxSteps
             });
             scene.result.history[period] = scene.result.history[period].splice(-100);
         };
 
         var restartActor = function restartActor(reward, reason) {
-            // if (instanceProps.test) {
-            //     scene.actor.tail.length > 2 &&
-            //         console.log('RS:', reward, reason, scene.result.epoch, scene.actor.step, scene.actor.tail.length, scene.agent.epsilon)
-            //     if (reason.indexOf('cycle') !== -1) {
-            //         console.log(reason, ' l: ' + scene.actor.tail.length)
-            //     }
-            // }
-            //console.log(reason, ' l: ' + scene.actor.tail.length)
             var historyRecord = {
                 size: scene.actor.tail.length,
                 step: scene.actor.step,
@@ -319,7 +324,6 @@ module.exports = {
             scene.actor.y = y;
             scene.actor.tail[0].x = x - 1;
             scene.actor.tail[0].y = y - 1;
-            initRivals();
             if (!scene.result.epoch) {
                 scene.result.epoch = 0;
             }
@@ -366,7 +370,7 @@ module.exports = {
             scene.food = scene.food.filter(function (one) {
                 return one.x !== food.x || one.y !== food.y;
             });
-            while (scene.food.length < scene.maxFood) {
+            while (scene.food.length < scene.maxFood + scene.spec.rivals) {
                 respawnFood(false);
             }
         };
@@ -527,6 +531,15 @@ module.exports = {
             return Math.min(limit, Math.max(dist, -1 * limit));
         };
 
+        var bodyMassPos = function bodyMassPos(actor) {
+            var pos = actor.tail.reduce(function (result, next) {
+                result.x += next.x;
+                result.y += next.y;
+                return result;
+            }, { x: actor.x, y: actor.y });
+            return { x: pos.x / actor.tail.length + 1, y: pos.y / actor.tail.length + 1 };
+        };
+
         var buildState = function buildState(actor) {
             var result = [];
             scene.params.features.map(function (one) {
@@ -536,6 +549,11 @@ module.exports = {
                     case FEATURE_HEAD_COORDINATES:
                         result.push(actor.x / scene.maxX);
                         result.push(actor.y / scene.maxY);
+                        break;
+                    case FEATURE_BODY_MASS_DIRECTION:
+                        var bmPos = bodyMassPos(actor);
+                        result.push(1 - (bmPos.x - actor.x) / scene.maxX);
+                        result.push(1 - (bmPos.y - actor.y) / scene.maxY);
                         break;
                     case FEATURE_CLOSEST_FOOD_DICRECTION:
                         if (actor.target) {
@@ -577,6 +595,9 @@ module.exports = {
                         break;
                     case FEATURE_FULL_MAP_6:
                         result = result.concat(buildFullMap(actor, 6));
+                        break;
+                    case FEATURE_FULL_MAP_12:
+                        result = result.concat(buildFullMap(actor, 12));
                         break;
                     case FEATURE_TAIL_SIZE:
                         result.push(actor.tail.length / scene.maxX * (scene.maxY / 3) - 0.5);
@@ -864,6 +885,16 @@ module.exports = {
             respawnFood(scene.actor, true);
             scene.actor.target = clone(scene.food[0]);
             scene.target = clone(scene.food[0]);
+            scene.pits = level.pits;
+            for (var x = 0; x <= scene.maxX; x++) {
+                pits[x] = {};
+                for (var y = 0; y <= scene.maxY; y++) {
+                    pits[x][y] = false;
+                }
+            }
+            scene.pits.forEach(function (pit) {
+                pits[pit.x][pit.y] = true;
+            });
         };
 
         return {
@@ -883,6 +914,7 @@ module.exports = {
             loadLevel: loadLevel,
             walls: walls,
             foods: foods,
+            pits: pits,
             initAgents: initAgents,
             implantBrain: implantBrain,
             setWall: setWall,
@@ -898,7 +930,9 @@ module.exports = {
                 FEATURE_HUNGER: FEATURE_HUNGER,
                 FEATURE_FULL_MAP_4: FEATURE_FULL_MAP_4,
                 FEATURE_FULL_MAP_6: FEATURE_FULL_MAP_6,
-                FEATURE_CLOSEST_FOOD_ANGLE: FEATURE_CLOSEST_FOOD_ANGLE
+                FEATURE_FULL_MAP_12: FEATURE_FULL_MAP_12,
+                FEATURE_CLOSEST_FOOD_ANGLE: FEATURE_CLOSEST_FOOD_ANGLE,
+                FEATURE_BODY_MASS_DIRECTION: FEATURE_BODY_MASS_DIRECTION
             }
         };
     }

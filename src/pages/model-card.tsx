@@ -98,14 +98,19 @@ class ModelCard extends React.Component<Props, State> {
     }
 
     renderChart(caption: string, data: any[]) {
-        const values = data.map(one => one.t);
+        const values = data.map(one => one.a || one.t);
         const max = values.reduce((result, next) => (next > result ? next : result), 0);
+        const mvalues = caption === '10' ? data.map(one => one.t) : [];
+        const mmax = caption === '10' ? mvalues.reduce((result, next) => (next > result ? next : result), 0) : 0;
+
+        const last = values[values.length - 1];
+        const mlast = mvalues[mvalues.length - 1];
         if (!data.length) {
             return '-';
         }
         return (
             <Grid container justify="center" spacing={8}>
-                <Grid key={'progress1'} item style={{ width: '50px', marginTop: '20px' }}>
+                <Grid key={'progress1'} item style={{ width: '50px', marginTop: '10px' }}>
                     <Typography type="subheading">{caption}</Typography>
                 </Grid>
                 <Grid key={'progress2'} item>
@@ -119,9 +124,34 @@ class ModelCard extends React.Component<Props, State> {
                         strokeWidth={2}
                         strokeLinecap={'butt'}
                     />
+                    {caption === '10' && <br />}
+                    {caption === '10' && (
+                        <Trend
+                            style={{ width: '200px', height: '60px' }}
+                            smooth
+                            autoDrawEasing="ease-out"
+                            data={mvalues}
+                            gradient={['purple', 'violet']}
+                            radius={10}
+                            strokeWidth={2}
+                            strokeLinecap={'butt'}
+                        />
+                    )}
                 </Grid>
-                <Grid key={'progress3'} item style={{ width: '50px', marginTop: '20px' }}>
-                    <Typography type="subheading">{max}</Typography>
+                <Grid key={'progress3'} item style={{ width: '50px', marginTop: '10px' }}>
+                    <Typography type="subheading">
+                        {max}
+                        <br />
+                        {last}
+                        {caption === '10' && (
+                            <div>
+                                <br />
+                                {mmax}
+                                <br />
+                                {mlast}
+                            </div>
+                        )}
+                    </Typography>
                 </Grid>
             </Grid>
         );
@@ -141,7 +171,7 @@ class ModelCard extends React.Component<Props, State> {
                 {this.renderCell('Wins', result.wins.toLocaleString())}
                 <Grid key={'progress'} item>
                     <Paper style={{ width: '328px', padding: '5px', marginRight: '10px' }}>
-                        <Typography type="subheading">{'Period, Progression, Max Tail Size'}</Typography>
+                        <Typography type="subheading">{'Period, Progression, Max(Avg) Tail Size'}</Typography>
                         {result.history && result.history['10'] && this.renderChart('10', result.history['10'])}
                         {result.history &&
                             result.history['100'] &&
