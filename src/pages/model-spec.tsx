@@ -55,7 +55,10 @@ class ModelSpecDialog extends React.Component<Props, State> {
         if (!form.size) {
             form.size = 7;
         }
-        if (!form.level) {
+        if (!form.rotation) {
+            form.rotation = 0;
+        }
+        if (this.props.worker.params.homelevel) {
             form.level = this.props.worker.params.homelevel || 'empty8x8';
         }
         this.setState({ form });
@@ -105,6 +108,24 @@ class ModelSpecDialog extends React.Component<Props, State> {
                             })}
                         </Select>
                     </FormControl>
+                    <Typography type="caption" color="inherit">
+                        {'Level Rotation Frequency'}
+                    </Typography>
+                    <Slider
+                        style={style}
+                        value={this.state.form.rotation}
+                        defaultValue={0}
+                        min={0}
+                        max={1000}
+                        step={50}
+                        onChange={this.handleChange('rotation')}
+                        marks={{
+                            1000: {
+                                label: <strong>{this.state.form.rotation}</strong>
+                            }
+                        }}
+                        handleStyle={handleStyle}
+                    />
                     <Typography type="caption" color="inherit">
                         {'Epsilon (Exploration rate)'}
                     </Typography>

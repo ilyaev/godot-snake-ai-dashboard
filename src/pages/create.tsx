@@ -9,6 +9,9 @@ import Select from 'material-ui/Select';
 import Input, { InputLabel } from 'material-ui/Input';
 import { MenuItem } from 'material-ui/Menu';
 import { levels } from '../common/levels';
+import Slider from 'rc-slider';
+import 'rc-slider/assets/index.css';
+import Typography from 'material-ui/Typography';
 
 type Props = {
     caption?: string;
@@ -28,7 +31,8 @@ class CreateModelDialog extends React.Component<Props, State> {
         open: false,
         form: {
             features: ['2', '10'],
-            level: ''
+            level: '',
+            rotation: 0
         } as any
     };
 
@@ -42,7 +46,7 @@ class CreateModelDialog extends React.Component<Props, State> {
 
     handleChange = (name: string) => (event: any) => {
         let form = this.state.form;
-        form[name] = event.target.value;
+        form[name] = event.target ? event.target.value : event;
         this.setState({
             form
         } as any);
@@ -66,6 +70,13 @@ class CreateModelDialog extends React.Component<Props, State> {
     };
 
     render() {
+        const style = { marginTop: '20px', marginBottom: '20px' };
+        const handleStyle = {
+            height: 28,
+            width: 28,
+            marginLeft: -14,
+            marginTop: -14
+        };
         return (
             <Dialog fullWidth={true} open={this.props.open} onRequestClose={this.handleClickCancel}>
                 <DialogTitle>Create New Model</DialogTitle>
@@ -124,6 +135,24 @@ class CreateModelDialog extends React.Component<Props, State> {
                                 ))}
                         </FormGroup>
                     </FormControl>
+                    <Typography type="caption" color="inherit">
+                        {'Level Rotation Frequency'}
+                    </Typography>
+                    <Slider
+                        style={style}
+                        value={this.state.form.rotation}
+                        defaultValue={0}
+                        min={0}
+                        max={1000}
+                        step={50}
+                        onChange={this.handleChange('rotation')}
+                        marks={{
+                            1000: {
+                                label: <strong>{this.state.form.rotation}</strong>
+                            }
+                        }}
+                        handleStyle={handleStyle}
+                    />
                     {/* <DialogContentText>Create New Model Right now!</DialogContentText> */}
                 </DialogContent>
                 <DialogActions>

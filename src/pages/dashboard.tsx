@@ -273,7 +273,8 @@ class Index extends React.Component<WithStyles<keyof typeof styles>, State> {
             cmd: 'CREATE_MODEL',
             features: form.features,
             name: form.name,
-            level: form.level
+            level: form.level,
+            rotation: form.rotation
         });
     }
 

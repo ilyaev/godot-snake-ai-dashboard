@@ -59,11 +59,11 @@ class SimulationDialog extends React.Component<Props, State> {
         if (clearWalls) {
             this.snake.clearCustomWalls();
         }
-        this.snake.scene.spec.rivals = (Math.floor(size / 7) - 1) * 2;
+        this.snake.scene.spec.rivals = 0; // (Math.floor(size / 7) - 1) * 2;
         this.snake.scene.params = model.params;
         this.snake.scene.modelName = this.props.model;
         this.snake.initScene();
-        this.snake.loadLevel(this.snake.scene.params.homelevel || 'random');
+        this.snake.loadLevel(size === 0 ? 'random' : this.snake.scene.params.homelevel || 'random');
         this.snake.restartActor(-1, 'init');
         model.maxX = this.snake.scene.maxX;
         model.maxY = this.snake.scene.maxY;
@@ -140,7 +140,10 @@ class SimulationDialog extends React.Component<Props, State> {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => this.onSizeChange(7)} color="primary" autoFocus>
-                        Alone
+                        Current
+                    </Button>
+                    <Button onClick={() => this.onSizeChange(0)} color="primary" autoFocus>
+                        Rnd
                     </Button>
                     <Button onClick={() => this.onSizeChange(30)} color="primary" autoFocus>
                         Rivals

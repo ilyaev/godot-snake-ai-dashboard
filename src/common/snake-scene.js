@@ -82,7 +82,7 @@ var config = {
     },
     spec: {
         alpha: 0.01,
-        epsilon: 0.01,
+        epsilon: 0.001,
         learningStepsPerIteration: 20,
         experienceSize: 10000,
         gamma: 0.95,
@@ -128,6 +128,8 @@ var config = {
     qvalues: {},
     history: [],
     agent: null,
+    stable: null,
+    maxAvg: 0,
     rivalAgent: null
 };
 
@@ -283,14 +285,23 @@ module.exports = {
             if (!scene.result.history[period]) {
                 scene.result.history[period] = [];
             }
+
+            var avgScore = res.sumTail / period;
+
             scene.result.history[period].push({
                 e: res.epoch,
                 p: period,
                 t: res.maxTail,
-                a: res.sumTail / period,
+                a: avgScore,
                 s: res.maxSteps
             });
+
             scene.result.history[period] = scene.result.history[period].splice(-100);
+
+            if (period === 100 && avgScore > scene.maxAvg) {
+                scene.stable = scene.agent.toJSON();
+                scene.maxAvg = avgScore;
+            }
         };
 
         var restartActor = function restartActor(reward, reason) {
@@ -313,9 +324,10 @@ module.exports = {
                     cb(Object.assign({}, historyRecord, { e: scene.agent.epsilon }));
                 }
             }
-
-            scene.history.push(historyRecord);
-            scene.history = scene.history.splice(-1000);
+            if (reason !== 'restart') {
+                scene.history.push(historyRecord);
+                scene.history = scene.history.splice(-1000);
+            }
             scene.actor = clone(scene.defaultActor);
             var place = getNextRivalPlace();
             var x = place.cX;
@@ -336,11 +348,11 @@ module.exports = {
             respawnFood(scene.actor, true);
             scene.actor.target = clone(scene.food[0]);
             scene.target = clone(scene.food[0]);
+            replay = [];
             if (instanceProps.onEpoch) {
                 var cb = instanceProps.onEpoch;
-                cb(scene.result.epoch, ['epoch:' + scene.result.epoch].concat(replay.slice(1)));
+                cb(scene.result.epoch, ['epoch:' + scene.result.epoch].concat(replay.slice(1)), historyRecord);
             }
-            replay = [];
         };
 
         var getNextFood = function getNextFood() {
@@ -468,12 +480,21 @@ module.exports = {
                 });
             }
             scene.food.forEach(function (food) {
-                return foods[food.x][food.y] = true;
+                if (!foods[food.x]) {
+                    foods[food.x] = {};
+                }
+                foods[food.x][food.y] = true;
             });
             getActiveActors().forEach(function (actor) {
+                if (!walls[actor.x]) {
+                    walls[actor.x] = {};
+                }
                 walls[actor.x][actor.y] = true;
                 actor.tail.forEach(function (one) {
-                    return walls[one.x][one.y] = true;
+                    if (!walls[one.x]) {
+                        walls[one.x] = {};
+                    }
+                    walls[one.x][one.y] = true;
                 });
             });
         };
@@ -798,6 +819,8 @@ module.exports = {
             }
             scene.params.maxX = maxX;
             scene.params.maxY = maxY;
+            walls = {};
+            foods = {};
             for (var x = 0; x <= scene.maxX; x++) {
                 if (!walls[x]) {
                     walls[x] = {};
@@ -838,9 +861,6 @@ module.exports = {
         };
 
         var printField = function printField() {
-            if (instanceProps.mode === 'client') {
-                return;
-            }
             console.log('F: ' + scene.food.length + ', H: ', scene.actor.x, ',', scene.actor.y, ' T: ', scene.actor.tail.length); //, scene.actor, scene.actor.tail)
             var row = '';
             console.log('-------- ' + scene.maxX + 'x' + scene.maxY + ' -------');
@@ -886,6 +906,7 @@ module.exports = {
             scene.actor.target = clone(scene.food[0]);
             scene.target = clone(scene.food[0]);
             scene.pits = level.pits;
+            pits = {};
             for (var x = 0; x <= scene.maxX; x++) {
                 pits[x] = {};
                 for (var y = 0; y <= scene.maxY; y++) {
