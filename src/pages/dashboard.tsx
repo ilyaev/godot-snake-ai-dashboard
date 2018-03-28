@@ -56,7 +56,7 @@ const ioCreator = (listener: (command: any) => void) => {
     let io =
         document.location.href.indexOf('localhost') !== -1
             ? ioClient('http://localhost:8080')
-            : ioClient('http://godot-snake-ai-trainer.herokuapp.com');
+            : ioClient(document.location.origin); // ioClient('http://godot-snake-ai-trainer.herokuapp.com');
 
     let connectionId = 0;
     let serverInstanceId = 0;
